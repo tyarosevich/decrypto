@@ -1,5 +1,4 @@
 env/
-project_notes.txt
 .env
 decrypto_env/
 decrypto/__pycache__/

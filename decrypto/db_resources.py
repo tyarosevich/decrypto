@@ -26,3 +26,16 @@ engine = create_engine(conn_string, connect_args=dct_conn_args)
 
 query = "SELECT * from test;"
 df = pd.read_sql(query, engine)
+
+#%% PUre python
+dct_conn_args = {
+    # "ssl": {
+        'ssl_ca': '/home/tyarosevich/Documents/access/decrypto-db.pem'
+    # }
+}
+host = "decrypto-db.cmspnvwujzak.us-west-2.rds.amazonaws.com:3306"
+db_name = "decrypto"
+conn_string = "mysql+mysqlconnector://{}:{}@{}/{}".format(db_login, db_pword, host, db_name)
+engine = create_engine(conn_string, connect_args=dct_conn_args)
+query = "SELECT * from test;"
+df = pd.read_sql(query, engine)

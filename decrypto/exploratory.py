@@ -30,7 +30,10 @@ df = pd.DataFrame(result.data)
 # #%%
 #### One liner for production to save memory.
 df_final = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).drop(['public_metrics'], axis=1)
-
+#%%
+result_data = result.data
+for tweet in result_data:
+    print(tweet.data['text'])
 #%% Count tweets
 count_result = client.get_recent_tweets_count("bitcoin")
 #%%

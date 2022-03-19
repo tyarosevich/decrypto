@@ -3,3 +3,4 @@ env/
 decrypto_env/
 decrypto/__pycache__/
 .idea/
+tweepy_env/

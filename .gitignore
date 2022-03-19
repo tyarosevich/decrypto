@@ -4,3 +4,4 @@ decrypto_env/
 decrypto/__pycache__/
 .idea/
 tweepy_env/
+lambda_layer_envs/

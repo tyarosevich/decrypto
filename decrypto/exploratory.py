@@ -10,12 +10,12 @@ twitter_api_info = get_secret()
 dct_auth = json.loads(twitter_api_info['SecretString'])
 bearer_token = dct_auth['twitter_bearer']
 query = "#bitcoin lang:en"
-lst_tweet_fields = ['lang', 'public_metrics', 'text']
+lst_tweet_fields = ['lang', 'public_metrics', 'text', 'created_at']
 params = {
     'start_time': None,
     'end_time': None,
     'expansions': None,
-    'max_results': 10,
+    'max_results': 100,
     'next_token': None,
     'tweet_fields': lst_tweet_fields
 
@@ -35,18 +35,35 @@ result_data = result.data
 for tweet in result_data:
     print(tweet.data['text'])
 #%% Count tweets
-count_result = client.get_recent_tweets_count("bitcoin")
-#%%
-next_token = result.meta['next_token']
-result2 = client.search_recent_tweets(query, next_token=next_token)
+# count_result = client.get_recent_tweets_count("bitcoin")
+# #%%
+# next_token = result.meta['next_token']
+# result2 = client.search_recent_tweets(query, next_token=next_token)
 
 # So grabbing tweets recursively could look something like:
 # TODO: add counts and date handling
-def get_tweets(client, query, dct, next_token=None):
-    result = client.search_recent_tweets(query, next_token=next_token)
-    # store results
-    next_token = result.meta['next_token']
-    return dct if not next_token else get_tweets(client, query, next_token)
+def get_tweets(client, query, dct_params, ret_max=1000):
+    lst_all_results = []
+    dct_params['next_token'] = None
+    while len(lst_all_results) < ret_max:
+        try:
+            result = client.search_recent_tweets(query, **params)
+        except (tweepy.HTTPException, tweepy.BadRequest, tweepy.Unauthorized, tweepy.Forbidden, tweepy.NotFound,
+                tweepy.TwitterServerError) as e:
+            pass
+        finally:
+            pass
+
+        lst_all_results += result.data
+        dct_params['next_token'] = result.meta['next_token']
+
+    return lst_all_results
+
+#%%
+
+test_two_pages = get_tweets(client, query, params, ret_max=200)
+df = pd.DataFrame(test_two_pages)
+df_final = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).drop(['public_metrics'], axis=1)
 
 #%%
 query = "bitcoin lang:en"

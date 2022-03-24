@@ -18,7 +18,7 @@ dct_conn_args = {
         'ssl_ca': '/home/tyarosevich/Documents/access/decrypto-db.pem'
     }
 }
-conn_string = "mariadb+pymysql://{}:{}@decrypto-db.cmspnvwujzak.us-west-2.rds.amazonaws.com/decrypto".format(db_login,
+conn_string = "mariadb+pymysql://{}:{}@decrypto-db.cmspnvwujzak.us-west-2.rds.amazonaws.com/decrypto?charset=utf8mb4".format(db_login,
                                                                                                                db_pword)
 engine = create_engine(conn_string, connect_args=dct_conn_args)
 
@@ -26,6 +26,11 @@ engine = create_engine(conn_string, connect_args=dct_conn_args)
 
 query = "SELECT * from test;"
 df = pd.read_sql(query, engine)
+
+#%% Test writing to the raw_tweets table
+table = 'raw_tweets'
+# Note, create df in exploratory
+df_final.to_sql(table, engine, index=False, if_exists='append')
 
 #%% PUre python
 dct_conn_args = {

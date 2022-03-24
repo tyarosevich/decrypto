@@ -29,7 +29,7 @@ df = pd.DataFrame(result.data)
 # df_final = pd.concat([df, df_meta], axis=1).drop(['public_metrics'], axis=1)
 # #%%
 #### One liner for production to save memory.
-df_final = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).drop(['public_metrics'], axis=1)
+df_final = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).drop(['public_metrics'], axis=1).reset_index(drop=True)
 #%%
 result_data = result.data
 for tweet in result_data:

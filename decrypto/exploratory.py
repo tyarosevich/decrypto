@@ -5,6 +5,7 @@ import json
 from decrypto.aws_resources import get_secret
 from datetime import datetime
 from datetime import timedelta
+import pytz
 #%%
 twitter_api_info = get_secret()
 dct_auth = json.loads(twitter_api_info['SecretString'])
@@ -34,9 +35,8 @@ df_final = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).
 result_data = result.data
 for tweet in result_data:
     print(tweet.data['text'])
-#%% Count tweets
-# count_result = client.get_recent_tweets_count("bitcoin")
-# #%%
+
+#%%
 # next_token = result.meta['next_token']
 # result2 = client.search_recent_tweets(query, next_token=next_token)
 
@@ -80,3 +80,45 @@ def get_start_stop():
     end_time = datetime(now.year, now.month, now.day)
 
     return start_time, end_time
+def get_24_hour_ranges():
+    local_timezone = pytz.timezone("America/Los_Angeles")
+    naive_start_time = datetime(2022, 3, 24, tzinfo=local_timezone)
+    utc_current_time = naive_start_time.astimezone(pytz.utc)
+    utc_current_plus1 = utc_current_time + timedelta(hours=1)
+    lst_timeranges = []
+    for i in range(24):
+        lst_timeranges.append((utc_current_time, utc_current_plus1))
+        utc_current_time += timedelta(hours=1)
+        utc_current_plus1 = utc_current_time + timedelta(hours=1)
+
+    return lst_timeranges
+
+
+#%% Count tweets
+
+local_timezone = pytz.timezone("America/Los_Angeles")
+naive_start_time = datetime(2022, 3, 24, 9, tzinfo=local_timezone)
+utc_start_time = naive_start_time.astimezone(pytz.utc)
+utc_end_time = naive_start_time + timedelta(hours=10)
+#%%
+# start_time = start_time - timedelta(days=5)
+count_result = client.get_recent_tweets_count(query, start_time=utc_start_time, end_time=utc_end_time)
+print(count_result.meta['total_tweet_count'])
+#%%
+lst_time_ranges = get_24_hour_ranges()
+lst_counts = []
+
+for timestamps in lst_time_ranges:
+    counts = client.get_recent_tweets_count(query, start_time=timestamps[0], end_time=timestamps[1])
+    lst_counts.append(counts.meta['total_tweet_count'])
+#%% Look at the tweet count for this query all day yesterday by hour.
+
+import matplotlib.pyplot as plt
+x = [x[0].astimezone(pytz.timezone("America/Los_Angeles")) for x in lst_time_ranges]
+y = lst_counts
+ax = plt.subplot(111)
+ax.bar(x, y, width=0.03)
+ax.xaxis_date()
+plt.show()
+#%%
+plt.clf()

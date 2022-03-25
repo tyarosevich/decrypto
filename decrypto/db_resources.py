@@ -24,7 +24,7 @@ engine = create_engine(conn_string, connect_args=dct_conn_args)
 
 #%%
 
-query = "SELECT * from test;"
+query = "SELECT * from raw_tweets;"
 df = pd.read_sql(query, engine)
 
 #%% Test writing to the raw_tweets table

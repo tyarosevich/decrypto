@@ -10,12 +10,12 @@ twitter_api_info = get_secret()
 dct_auth = json.loads(twitter_api_info['SecretString'])
 bearer_token = dct_auth['twitter_bearer']
 query = "#bitcoin lang:en"
-lst_tweet_fields = ['lang', 'public_metrics', 'text', 'created_at']
+lst_tweet_fields = ['lang', 'public_metrics', 'text', 'created_at', 'geo']
 params = {
     'start_time': None,
     'end_time': None,
-    'expansions': None,
-    'max_results': 100,
+    'expansions': ['geo.place_id'],
+    'max_results': 10,
     'next_token': None,
     'tweet_fields': lst_tweet_fields
 
@@ -67,23 +67,16 @@ df_final = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).
 
 #%%
 query = "bitcoin lang:en"
-yesterday = datetime.now() - timedelta(days = 1)
-start_tie = datetime(yesterday.year, yesterday.month, yesterday.day).strftime("%Y-%m-%dT%H:%M:%SZ")
-now = datetime.now()
-end_time = datetime(now.year, now.month, now.day).strftime("%Y-%m-%dT%H:%M:%SZ")
-max_resuls = 510
+def get_start_stop():
+    '''
+    A simple method to return start/end times for the twitter API call. Encapsulates the full 24 hour period of the day
+    before the current call, i.e. yesterday. Second granular, but starts and ends at 00:00:00.
+    :return: tuple
+    (start_time, end_time)
+    '''
+    yesterday = datetime.now() - timedelta(days=1)
+    start_time = datetime(yesterday.year, yesterday.month, yesterday.day)
+    now = datetime.now()
+    end_time = datetime(now.year, now.month, now.day)
 
-#%% v1 test
-consumer_key = dct_auth['twitter_dev']
-consumer_secret = dct_auth['twitter_secret']
-access_token = dct_auth['twitter_access']
-access_token_secret = dct_auth['twitter_access_secret']
-bearer_token = dct_auth['twitter_bearer']
-# auth = tweepy.OAuth1UserHandler(
-#    consumer_key, consumer_secret, access_token, access_token_secret
-# )
-
-auth = tweepy.OAuth2BearerHandler(bearer_token)
-api = tweepy.API(auth)
-#%%
-test_return = api.search_30_day(label='Developer', query="bitcoin", max_resuls=10)
+    return start_time, end_time

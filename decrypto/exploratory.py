@@ -122,3 +122,56 @@ ax.xaxis_date()
 plt.show()
 #%%
 plt.clf()
+
+#%%
+# local_timezone = pytz.timezone("America/Los_Angeles")
+naive_start_time = datetime.now(pytz.utc)
+naive_start_time = naive_start_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+lst_scalars = list(range(24))
+hour_delta = timedelta(hours=1)
+lst_timedeltas = [x*hour_delta for x in lst_scalars]
+lst_starts = [naive_start_time + x for x in lst_timedeltas]
+lst_ends = [x + hour_delta for x in lst_starts]
+
+# #%%
+# twitter_api_info = get_secret()
+# dct_auth = json.loads(twitter_api_info['SecretString'])
+# bearer_token = dct_auth['twitter_bearer']
+# ret_max = 41
+# query = "#bitcoin lang:en"
+# lst_tweet_fields = ['lang', 'public_metrics', 'text', 'created_at']
+# lst_times = get_start_stop()
+# idx_hour = 7
+# dct_params = {
+#     'start_time': None,
+#     'end_time': None,
+#     'expansions': None,
+#     'max_results': 10,
+#     'next_token': None,
+#     'tweet_fields': lst_tweet_fields
+#
+# }
+# client = tweepy.Client(bearer_token, wait_on_rate_limit=True)
+# lst_resultsbyhour = []
+# for start_time, end_time in get_start_stop():
+#     dct_params['start_time'] = start_time
+#     dct_params['end_time'] = end_time
+#     lst_resultsbyhour.append(api_request(client, query, ret_max, dct_params))
+# #%%
+# idx_hour = 1
+# lst_times = get_start_stop()
+# dct_params['start_time'] = lst_times[idx_hour][0]
+# dct_params['end_time'] = lst_times[idx_hour][1]
+#
+# test = api_request(client, query, ret_max, dct_params)
+# print(len(test))
+#
+# count_test = client.get_recent_tweets_count(query, start_time=dct_params['start_time'], end_time=dct_params['end_time'])
+# print(count_test.meta['total_tweet_count'])
+# #%%
+# query = "#bitcoin lang:en"
+# lst_times = get_start_stop()
+# start = lst_times[2][0]
+# end = lst_times[2][1]
+# counts = client.get_recent_tweets_count(query, start_time=start, end_time=end)
+# print(counts.meta['total_tweet_count'])

@@ -7,6 +7,8 @@ from datetime import datetime
 from datetime import timedelta
 import pytz
 #%%
+df = pd.DataFrame([{'foo': 'bar'}])
+#%%
 twitter_api_info = get_secret()
 dct_auth = json.loads(twitter_api_info['SecretString'])
 bearer_token = dct_auth['twitter_bearer']

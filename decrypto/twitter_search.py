@@ -3,9 +3,39 @@ import tweepy
 from datetime import datetime
 from datetime import timedelta
 import pytz
+from aws_resources import get_secret
+import json
 
 # So grabbing tweets recursively could look something like:
 # TODO: add counts and date handling
+
+def tweet_handler(query, ret_max):
+    '''
+    A top level wrapper to retrieve tweets. Many parameters are hard coded for the use-case, see docs for details.
+    :param query: str
+    :param ret_max: int
+    :return: DataFrame
+    '''
+
+    twitter_api_info = get_secret()
+    dct_auth = json.loads(twitter_api_info['SecretString'])
+    bearer_token = dct_auth['twitter_bearer']
+    lst_tweet_fields = ['lang', 'public_metrics', 'text', 'created_at']
+    dct_params = {
+        'start_time': None,
+        'end_time': None,
+        'expansions': None,
+        'max_results': 10,
+        'next_token': None,
+        'tweet_fields': lst_tweet_fields
+
+    }
+    client = tweepy.Client(bearer_token, wait_on_rate_limit=True)
+
+    df_tweet_batch = get_tweets(client, query, ret_max, dct_params)
+
+    return df_tweet_batch
+
 def api_request(client, query, ret_max, dct_params):
     """
     Iteratively makes API requests until the number of resulting records exceeds ret_max. Note this can always

@@ -7,7 +7,7 @@ import mariadb
 import pymysql
 from decrypto.aws_resources import get_secret
 import json
-from twitter_search import import tweet_handler
+from decrypto.twitter_search import tweet_handler
 #%%
 decrypto_secrets = get_secret()
 dct_auth = json.loads(decrypto_secrets['SecretString'])
@@ -44,15 +44,20 @@ host = "decrypto-db.cmspnvwujzak.us-west-2.rds.amazonaws.com:3306"
 db_name = "decrypto"
 conn_string = "mysql+mysqlconnector://{}:{}@{}/{}".format(db_login, db_pword, host, db_name)
 engine = create_engine(conn_string, connect_args=dct_conn_args)
-query = "SELECT * from raw_tweets;"
-df_before = pd.read_sql(query, engine)
+sql_query = "SELECT * from raw_tweets;"
+df_before = pd.read_sql(sql_query, engine)
 
 #%% Get some new tweets
 query = "#bitcoin lang:en"
 ret_max = 100
+df_new_tweets = tweet_handler(query, ret_max)
 
 #%% Pure pytho test writing
 
 table = 'raw_tweets'
 # Note, create df in exploratory
-df_final.to_sql(table, engine, index=False, if_exists='append')
+df_new_tweets.to_sql(table, engine, index=False, if_exists='append')
+
+#%% Check that they were appended
+
+df_after = pd.read_sql(sql_query, engine)

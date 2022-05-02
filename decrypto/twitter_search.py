@@ -3,7 +3,7 @@ import tweepy
 from datetime import datetime
 from datetime import timedelta
 import pytz
-from aws_resources import get_secret
+from decrypto.aws_resources import get_secret
 import json
 
 # So grabbing tweets recursively could look something like:

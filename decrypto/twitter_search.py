@@ -112,4 +112,7 @@ def get_tweets(client, query, ret_max, dct_params):
     df = pd.DataFrame(lst_results)
 
     # Public metrics is a list of dicts with matching keys. Flattens this into columns and drops the original.
-    return pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).drop(['public_metrics'], axis=1)
+    df = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).drop(['public_metrics'], axis=1)
+    df.rename(columns={'created_at': 'timestamp'}, inplace=True)
+
+    return df

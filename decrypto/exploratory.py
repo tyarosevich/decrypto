@@ -177,3 +177,13 @@ lst_ends = [x + hour_delta for x in lst_starts]
 # end = lst_times[2][1]
 # counts = client.get_recent_tweets_count(query, start_time=start, end_time=end)
 # print(counts.meta['total_tweet_count'])
+
+#%%
+import requests
+url = "http://www.kite.com"
+timeout = 5
+try:
+	request = requests.get(url, timeout=timeout)
+	print("Connected to the Internet")
+except (requests.ConnectionError, requests.Timeout) as exception:
+	print("No internet connection.")

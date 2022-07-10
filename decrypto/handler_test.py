@@ -1,4 +1,4 @@
-from decrypto.twitter_search import get_tweets, get_start_stop
+from decrypto.twitter_search import get_tweets, get_start_stop, tweet_handler
 import pandas as pd
 import tweepy
 import json
@@ -29,5 +29,9 @@ def lambda_handler(event, context):
     table = 'raw_tweets'
     db_write(df_tweet_batch, table, engine)
 
+#%%
+query = "#bitcoin lang:en"
+ret_max = 500
+df_tweet_batch = tweet_handler(query, ret_max)
 
 

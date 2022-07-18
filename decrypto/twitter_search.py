@@ -25,7 +25,7 @@ def tweet_handler(query, ret_max):
         'start_time': None,
         'end_time': None,
         'expansions': None,
-        'max_results': 10,
+        'max_results': 100,
         'next_token': None,
         'tweet_fields': lst_tweet_fields
 
@@ -36,7 +36,7 @@ def tweet_handler(query, ret_max):
 
     return df_tweet_batch
 
-def api_request(client, query, ret_max, dct_params):
+def api_request(client, query, per_hour_max, dct_params):
     """
     Iteratively makes API requests until the number of resulting records exceeds ret_max. Note this can always
     overshoot by up to dct_params['max_results'].
@@ -54,15 +54,12 @@ def api_request(client, query, ret_max, dct_params):
     result = client.search_recent_tweets(query, **dct_params)
     dct_params['next_token'] = result.meta.get("next_token")
     lst_all_results += result.data
-    while (len(lst_all_results) < ret_max) and (dct_params["next_token"] is not None):
+    while (len(lst_all_results) < per_hour_max) and (dct_params["next_token"] is not None):
         try:
             result = client.search_recent_tweets(query, **dct_params)
-
         except (tweepy.HTTPException, tweepy.BadRequest, tweepy.Unauthorized, tweepy.Forbidden, tweepy.NotFound,
                 tweepy.TwitterServerError) as e:
-            print(e)
-        except Exception as e:
-            print(e)
+            raise
         if result.data:
             lst_all_results += result.data
 
@@ -77,6 +74,9 @@ def get_start_stop():
     :return: list
     [(start_time, end_time), ...]
     '''
+
+    # Takes the current UTC time, sets it to the start of the day, then constructs 24 pairs of UTC start/stop times
+    # with one-hour lengths.
     naive_start_time = datetime.now(pytz.utc)
     naive_start_time = naive_start_time.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
     lst_scalars = list(range(24))
@@ -112,7 +112,9 @@ def get_tweets(client, query, ret_max, dct_params):
     df = pd.DataFrame(lst_results)
 
     # Public metrics is a list of dicts with matching keys. Flattens this into columns and drops the original.
+    # Code is compact, but it's just grabbing the list of dicts, turning it into a new dataframe, concenating with
+    # the original, and dropping the old column.
     df = pd.concat([df, pd.DataFrame(df['public_metrics'].tolist())], axis=1).drop(['public_metrics'], axis=1)
-    df.rename(columns={'created_at': 'timestamp'}, inplace=True)
+    # df.rename(columns={'created_at': 'timestamp'}, inplace=True)
 
     return df

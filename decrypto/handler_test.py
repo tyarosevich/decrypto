@@ -10,7 +10,7 @@ def lambda_handler(event, context):
     twitter_api_info = get_secret()
     dct_auth = json.loads(twitter_api_info['SecretString'])
     bearer_token = dct_auth['twitter_bearer']
-    ret_max = 500
+    ret_max = 10
     query = "#bitcoin lang:en"
     lst_tweet_fields = ['lang', 'public_metrics', 'text', 'created_at']
     dct_params = {
@@ -25,9 +25,9 @@ def lambda_handler(event, context):
     client = tweepy.Client(bearer_token, wait_on_rate_limit=True)
     df_tweet_batch = get_tweets(client, query, ret_max, dct_params)
 
-    engine = get_db_engine()
-    table = 'raw_tweets'
-    db_write(df_tweet_batch, table, engine)
+    # engine = get_db_engine()
+    # table = 'raw_tweets'
+    # db_write(df_tweet_batch, table, engine)
 
 #%%
 query = "#bitcoin lang:en"

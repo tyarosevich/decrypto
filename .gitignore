@@ -6,3 +6,4 @@ decrypto/__pycache__/
 tweepy_env/
 lambda_layer_envs/
 lambda_deployment_package/
+data/

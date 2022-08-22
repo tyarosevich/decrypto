@@ -7,8 +7,8 @@ import base64
 from botocore.exceptions import ClientError
 
 
-def get_secret():
-    secret_name = "twitter_api_info"
+def get_secret(secret_name):
+    
     region_name = "us-west-2"
 
     # Create a Secrets Manager client

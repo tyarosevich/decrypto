@@ -1,15 +1,20 @@
+<<<<<<< HEAD
 from dotenv import load_dotenv
 load_dotenv()
+=======
+>>>>>>> main
 from sqlalchemy import create_engine
+from sqlalchemy.dialects.mysql import insert
 import pandas as pd
 import pymysql
-from decrypto.aws_resources import get_secret
+from aws_resources import get_secret
 import json
 # Note this assumes AWS Lambda, with its preconfigured logger.
 import logging
 logging.getLogger().setLevel(logging.INFO)
 
 def get_db_engine():
+<<<<<<< HEAD
 
     decrypto_secrets = get_secret()
     dct_auth = json.loads(decrypto_secrets['SecretString'])
@@ -26,6 +31,26 @@ def get_db_engine():
 
     return create_engine(conn_string, connect_args=dct_conn_args)
 
+=======
+
+    db_secrets = get_secret('decrypto-db-secrets')
+    dct_auth = json.loads(db_secrets['SecretString'])
+    db_login = dct_auth['username']
+    db_pword = dct_auth['password']
+    # dct_conn_args = {
+    #     # "ssl": {
+    #     'ssl_ca': '/home/tyarosevich/Documents/access/decrypto-db.pem'
+    #     # }
+    # }
+    host = dct_auth['host']
+    host = '{}{}'.format(host, ':3306')
+    db_name = "decrypto"
+    conn_string = "mysql+pymysql://{}:{}@{}/{}".format(db_login, db_pword, host, db_name)
+
+    # return create_engine(conn_string, connect_args=dct_conn_args)
+    return create_engine(conn_string)
+
+>>>>>>> main
 def db_read(sql_query, engine):
     '''
     Superfluous wrapper for pandas sql query.
@@ -34,11 +59,21 @@ def db_read(sql_query, engine):
     :return: DataFrame
     '''
 
+<<<<<<< HEAD
     try:
         df = pd.read_sql(sql_query, engine)
     except:
         # TODO
         pass
+=======
+    # try:
+    #     df = pd.read_sql(sql_query, engine)
+    # except Exception as e:
+    #     # TODO
+    #     print(e)
+        
+    df = pd.read_sql(sql_query, engine)
+>>>>>>> main
 
     return df
 
@@ -50,9 +85,21 @@ def db_write(df, table, engine):
     :param engine: Engine
     :return: None
     '''
+<<<<<<< HEAD
     try:
         df.to_sql(table, engine, index=False, if_exists='append', chunksize=1000, method='multi')
     except:
         # TODO
         pass
     return
+=======
+    # Insure no weird columns sneak through.
+    lst_accepted_cols = ["id", "text", "lang", "created_at", "retweet_count", "reply_count", "like_count", "quote_count"]
+    df = df[lst_accepted_cols]
+    try:
+        df.to_sql(table, engine, index=False, if_exists='append', chunksize=1000, method='multi')
+    except:
+        raise
+    
+    return
+>>>>>>> main

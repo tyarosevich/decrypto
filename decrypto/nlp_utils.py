@@ -12,10 +12,11 @@ analyzer = create_analyzer(task="sentiment", lang="en")
 
 #%%
 start = time()
-for tweet in df_test_tweets['text'].tolist()[0:10]:
-    print(tweet)
-    print(analyzer.predict(tweet))
-    print('##################################')
+for tweet in df_test_tweets['text'].tolist()[0:50]:
+    # print(tweet)
+    result = analyzer.predict(tweet)
+    # print(result)
+    # print('##################################')
 
 stop = time()
 print(stop - start)

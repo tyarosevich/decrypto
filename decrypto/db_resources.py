@@ -6,7 +6,9 @@ from aws_resources import get_secret
 import json
 # Note this assumes AWS Lambda, with its preconfigured logger.
 import logging
+
 logging.getLogger().setLevel(logging.INFO)
+
 
 def get_db_engine():
 
@@ -27,6 +29,7 @@ def get_db_engine():
     # return create_engine(conn_string, connect_args=dct_conn_args)
     return create_engine(conn_string)
 
+
 def db_read(sql_query, engine):
     '''
     Superfluous wrapper for pandas sql query.
@@ -40,10 +43,11 @@ def db_read(sql_query, engine):
     # except Exception as e:
     #     # TODO
     #     print(e)
-        
+
     df = pd.read_sql(sql_query, engine)
 
     return df
+
 
 def db_write(df, table, engine):
     '''
@@ -54,11 +58,12 @@ def db_write(df, table, engine):
     :return: None
     '''
     # Insure no weird columns sneak through.
-    lst_accepted_cols = ["id", "text", "lang", "created_at", "retweet_count", "reply_count", "like_count", "quote_count"]
+    lst_accepted_cols = ["id", "text", "lang", "created_at", "retweet_count", "reply_count", "like_count",
+                         "quote_count"]
     df = df[lst_accepted_cols]
     try:
         df.to_sql(table, engine, index=False, if_exists='append', chunksize=1000, method='multi')
     except:
         raise
-    
+
     return

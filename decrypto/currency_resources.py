@@ -29,7 +29,7 @@ def _get_jsonparsed_data(url):
 
 def _get_stock_indexes():
 
-    stock_secrets = get_secret('stock-api-secrets')
+    stock_secrets = get_secret('stock_api_secrets')
     dct_auth = json.loads(stock_secrets['SecretString'])
     api_key = dct_auth['stock_api_key']
 

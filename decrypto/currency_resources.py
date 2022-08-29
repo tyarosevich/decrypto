@@ -27,19 +27,21 @@ def _get_jsonparsed_data(url):
     data = response.read().decode("utf-8")
     return json.loads(data)
 
-def _get_stock_indexes():
+def _get_finance_api_key():
 
     stock_secrets = get_secret('stock_api_secrets')
     dct_auth = json.loads(stock_secrets['SecretString'])
-    api_key = dct_auth['stock_api_key']
+    return dct_auth['stock_api_key']
+
+def _get_stock_indexes(api_key):
 
     url = ("https://financialmodelingprep.com/api/v3/quote/{}?apikey={}").format(",".join(lst_index_codes_formatted), api_key)
     result = _get_jsonparsed_data(url)
     return pd.DataFrame(result)
 
-def update_indexes_to_db():
-    
-    df_raw = _get_stock_indexes()
+def _update_stock_indexes(api_key, engine):
+
+    df_raw = _get_stock_indexes(api_key)
     df_raw['symbol_sort'] = pd.Categorical(
         df_raw['symbol'],
         categories=lst_index_codes,
@@ -55,7 +57,37 @@ def update_indexes_to_db():
     engine = get_db_engine()
     db_write(df_update, 'raw_stock_indexes', engine)
 
+def update_indexes_to_db():
+
+    engine = get_db_engine()
+    api_key = _get_finance_api_key()
+    _update_stock_indexes(api_key, engine)
+
+    _update_crypto_prices(api_key, engine)
 
 
+def _update_crypto_prices(api_key, engine):
 
+    lst_crypto_codes = ['BTCUSD', 'ETHUSD']
+    df_raw = _get_stock_indexes(api_key, lst_crypto_codes)
+    df_raw['symbol_sort'] = pd.Categorical(
+        df_raw['symbol'],
+        categories=lst_index_codes,
+        ordered=True
+    )
+    df_raw.sort_values('symbol_sort', inplace=True)
+    cols = ['created_at'] + lst_index_codes
+    df_update = pd.DataFrame(columns=cols)
+    naive_start_time = datetime.now(pytz.utc)
+    update_vals = [naive_start_time] + df_raw['price'].to_list()
+    df_update.loc[0] = update_vals
+
+    engine = get_db_engine()
+    db_write(df_update, 'raw_crypto_prices', engine)
+
+def _get_stock_indexes(api_key, lst_crypto_codes):
+
+    url = 'https://financialmodelingprep.com/api/v3/quote/{}?apikey={}'.format(",".join(lst_crypto_codes), api_key)
+    result = _get_jsonparsed_data(url)
+    return pd.DataFrame(result)
 

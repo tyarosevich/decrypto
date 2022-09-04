@@ -57,10 +57,7 @@ def db_write(df, table, engine):
     :param engine: Engine
     :return: None
     '''
-    # Insure no weird columns sneak through.
-    lst_accepted_cols = lst_index_codes = ['created_at', '^TYX', '^FVX', '^TNX', '^HSCE', '^SPGSCI', '^STI', '^BVSP', '^MXX', '^GSPTSE', '^VIX', '^DJI', '^FCHI', '^N100', 'IMOEX.ME', '^AXJO', '^NZ50', '^N225', '^TWII', '^BFX', '^TA125.TA', '^KLSE', '^BSESN', '^STOXX50E', '^IXIC', '^KS11', '^JN0U.JO', '000001.SS', '^CASE30', '^GSPC', '^FTSE', '^BUK100P', '^AORD', '^RUT', '^GDAXI', '^JKSE', '^HSI', '^NSEI', '^NSEBANK', '^SP500TR', '^DJITR', '^RUTTR', '^XNDX', '^RUITR', '^RUATR', '^RMCCTR', '^AEX', '^IRX', '^DJT', '^NDX', '^RUA', '^RUI', '^RVX', '^VXN', '^OVX', '^GVZ', '^VVIX', '^VXSLV', '^IBEX', '^SSMI', 'DX-Y.NYB', '^XAX', '^MID', '^NYA', 'TX60.TS', 'XU100.IS']
 
-    df = df[lst_accepted_cols]
     try:
         df.to_sql(table, engine, index=False, if_exists='append', chunksize=1000, method='multi')
     except:

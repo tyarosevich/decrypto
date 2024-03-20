@@ -4,7 +4,7 @@ decrypto_env/
 decrypto/__pycache__/
 .idea/
 tweepy_env/
-lambda_layer_envs/
-lambda_deployment_package/
+lambda_resources/lambda_layer_envs/
+lambda_resources/lambda_deployment_package/
 data/
 temp/

@@ -27,4 +27,12 @@ df_stock_index_lookup = pd.read_csv(stock_index_lookup_path)
 for df in [df_tweets, df_crypto_prices, df_stock_prices]:
     df.rename(columns={'created_at': 'date'}, inplace=True)
 
-#%%
+#%% Hourly historical Indexes
+hourly_index_col_names = ['date', 'hour', 'open', 'high', 'low', 'close', 'volume']
+nasdaq_hourly_path = Path(r'/home/tyarosevich/Projects/decrypto/data/nasdaq_hourly.csv')
+s_and_p_hourly_path = Path(r'/home/tyarosevich/Projects/decrypto/data/s_and_p_hourly.csv')
+dowjones_hourly_path = Path(r'/home/tyarosevich/Projects/decrypto/data/dowjones_hourly.csv')
+df_nasdaq_hourly = pd.read_csv(nasdaq_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
+df_dowjones_hourly = pd.read_csv(dowjones_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
+df_s_and_p_hourly = pd.read_csv(s_and_p_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
+

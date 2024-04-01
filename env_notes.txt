@@ -1,0 +1,15 @@
+##### Container Env Notes ######
+
+Currently using the Nvidia NGC Pytorch container. A few notes:
+
+- You had to add yourself as a user to the docker group (the group had already been created), and login with an API key from NGC.
+- The container says it has a conda env. The documentation is wrong and all over the place. There is no conda env, it's not 3.8, it's not 3.5
+  but the base python 3.10 install inthe container appears to be the intended interpreter and has pytorch etc installed.
+- Pycharm does not support the right docker-compose features and as a workaround, your SYSTEM (not container) /etc/docker/daemon.json file needs
+  to be updated to include the following line above the "runtimes" key:
+
+  	- "default-runtime": "nvidia", 
+
+  this appears to fix the problem, and my 3060 is recognized when running the env in Pycharm.
+
+  

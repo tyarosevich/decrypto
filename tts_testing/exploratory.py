@@ -3,7 +3,8 @@ from pathlib import Path
 
 #%%
 
-tabular_folder = '/home/tyarosevich/Projects/decrypto/data/'
+# tabular_folder = '/home/tyarosevich/Projects/decrypto/data/'
+tabular_folder = './data/' # If using container (project root is automatically mounted).
 lookup_path = Path(tabular_folder + 'crypto_lookup_202304251523.csv')
 crypto_prices_path = Path(tabular_folder + 'raw_crypto_prices_202304251523.csv')
 stock_index_path = Path(tabular_folder + 'raw_stock_indexes_202304251524.csv')
@@ -29,10 +30,22 @@ for df in [df_tweets, df_crypto_prices, df_stock_prices]:
 
 #%% Hourly historical Indexes
 hourly_index_col_names = ['date', 'hour', 'open', 'high', 'low', 'close', 'volume']
-nasdaq_hourly_path = Path(r'/home/tyarosevich/Projects/decrypto/data/nasdaq_hourly.csv')
-s_and_p_hourly_path = Path(r'/home/tyarosevich/Projects/decrypto/data/s_and_p_hourly.csv')
-dowjones_hourly_path = Path(r'/home/tyarosevich/Projects/decrypto/data/dowjones_hourly.csv')
+nasdaq_hourly_path = Path(tabular_folder + 'nasdaq_hourly.csv')
+s_and_p_hourly_path = Path(tabular_folder + 's_and_p_hourly.csv')
+dowjones_hourly_path = Path(tabular_folder + 'dowjones_hourly.csv')
 df_nasdaq_hourly = pd.read_csv(nasdaq_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
 df_dowjones_hourly = pd.read_csv(dowjones_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
 df_s_and_p_hourly = pd.read_csv(s_and_p_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
 
+#%% Additional Crypto resources.
+
+link_path = Path(tabular_folder + 'Gemini_LINKUSD_1h.csv')
+sol_path = Path(tabular_folder + 'Gemini_SOLUSD_1h.csv')
+usdc_path = Path(tabular_folder + 'Gemini_USDCUSD_1h.csv')
+# ust_path = Path(tabular_folder + 'Gemini_USTUSD_1h.csv') # Data ends in 2022 for some reason.
+df_link = pd.read_csv(link_path, low_memory=False)
+df_sol = pd.read_csv(sol_path, low_memory=False)
+df_usdc = pd.read_csv(usdc_path, low_memory=False)
+# df_ust = pd.read_csv(ust_path, low_memory=False)
+for df_curr in [df_link, df_sol, df_usdc]:
+    df_curr['date'] = pd.to_datetime(df_curr['unix'], unit='ms', utc=True)

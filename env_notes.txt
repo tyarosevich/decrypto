@@ -12,4 +12,5 @@ Currently using the Nvidia NGC Pytorch container. A few notes:
 
   this appears to fix the problem, and my 3060 is recognized when running the env in Pycharm.
 
-  
+  UPDATE:
+  Switched to building from Dockerfile in project root. Rebuilds should be rare, and this is more portable. If I run into issues, can just store on ECR for 90 cents a month.

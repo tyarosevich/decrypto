@@ -1,0 +1,2 @@
+FROM nvcr.io/nvidia/pytorch:24.03-py3
+RUN python -m pip install darts transformers seaborn plotly idna oauthlib pandas python-dateutil python-dotenv pytz requests requests-oauthlib tweepy urllib3 SQLAlchemy PyMySQL boto3

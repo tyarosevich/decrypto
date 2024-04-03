@@ -27,8 +27,9 @@ df_tweets['created_at'] = pd.to_datetime(df_tweets['created_at'])
 df_stock_index_lookup = pd.read_csv(stock_index_lookup_path)
 for df in [df_tweets, df_crypto_prices, df_stock_prices]:
     df.rename(columns={'created_at': 'date'}, inplace=True)
+df_tweets['date'] = pd.to_datetime(df_tweets['date']).dt.tz_localize('UTC')
 
-#%% Hourly historical Indexes
+# Hourly historical Indexes
 hourly_index_col_names = ['date', 'hour', 'open', 'high', 'low', 'close', 'volume']
 nasdaq_hourly_path = Path(tabular_folder + 'nasdaq_hourly.csv')
 s_and_p_hourly_path = Path(tabular_folder + 's_and_p_hourly.csv')
@@ -36,6 +37,10 @@ dowjones_hourly_path = Path(tabular_folder + 'dowjones_hourly.csv')
 df_nasdaq_hourly = pd.read_csv(nasdaq_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
 df_dowjones_hourly = pd.read_csv(dowjones_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
 df_s_and_p_hourly = pd.read_csv(s_and_p_hourly_path, low_memory=False, names=hourly_index_col_names, delimiter=';')
+
+for df_curr in [df_nasdaq_hourly, df_dowjones_hourly, df_s_and_p_hourly]:
+    df_curr['date'] = df_curr['date'] + '-' + df_curr['hour']
+    df_curr['date'] = pd.to_datetime(df_curr['date'], dayfirst=True).dt.tz_localize('US/EASTERN').dt.tz_convert('UTC')
 
 #%% Additional Crypto resources.
 
@@ -49,3 +54,11 @@ df_usdc = pd.read_csv(usdc_path, low_memory=False)
 # df_ust = pd.read_csv(ust_path, low_memory=False)
 for df_curr in [df_link, df_sol, df_usdc]:
     df_curr['date'] = pd.to_datetime(df_curr['unix'], unit='ms', utc=True)
+
+#%% Test joining stock info onto bitcoin by nearest hourly value.
+
+# This works well, but there are duplicate column names (open etc.)
+df_bitcoin_hourly.sort_values(by='date', inplace=True)
+df_btc_sp_merged = pd.merge_asof(df_bitcoin_hourly, df_s_and_p_hourly, on='date', tolerance=pd.Timedelta("1h"))
+
+#%% Testing sentiment model

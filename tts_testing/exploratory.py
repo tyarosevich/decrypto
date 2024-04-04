@@ -1,5 +1,6 @@
 import pandas as pd
 from pathlib import Path
+import os
 
 #%%
 
@@ -41,6 +42,12 @@ df_s_and_p_hourly = pd.read_csv(s_and_p_hourly_path, low_memory=False, names=hou
 for df_curr in [df_nasdaq_hourly, df_dowjones_hourly, df_s_and_p_hourly]:
     df_curr['date'] = df_curr['date'] + '-' + df_curr['hour']
     df_curr['date'] = pd.to_datetime(df_curr['date'], dayfirst=True).dt.tz_localize('US/EASTERN').dt.tz_convert('UTC')
+    df_curr.drop(columns=['hour'], inplace=True)
+col_append_vals = ['_SP500', '_NSDQ', '_DJ']
+append_cols = ['open', 'high', 'low', 'close', 'volume']
+for df_curr, append_str in zip([df_s_and_p_hourly, df_nasdaq_hourly, df_dowjones_hourly], col_append_vals):
+    curr_append_cols = [col + append_str for col in append_cols]
+    df_curr.rename(columns=dict(zip(append_cols, curr_append_cols)), inplace=True)
 
 #%% Additional Crypto resources.
 
@@ -55,10 +62,56 @@ df_usdc = pd.read_csv(usdc_path, low_memory=False)
 for df_curr in [df_link, df_sol, df_usdc]:
     df_curr['date'] = pd.to_datetime(df_curr['unix'], unit='ms', utc=True)
 
+#%% Load the Kaggle Tweet data
+
+path_kaggle_tweets = Path(tabular_folder + 'kaggle_bitcoin_tweets_filtered.csv')
+if path_kaggle_tweets.is_file():
+    df_kaggle = pd.read_csv(path_kaggle_tweets)
+else:
+    df_kaggle = pd.read_csv('./data/Bitcoin_tweets.csv')
+    df_kaggle = df_kaggle[df_kaggle['date'].notna()]
+    df_kaggle = df_kaggle[df_kaggle['is_retweet'] == False]
+    df_kaggle.drop(columns=['user_name', 'user_location', 'user_description', 'user_created', 'user_followers',
+                            'user_friends', 'user_favourites', 'user_verified', 'is_retweet', 'hashtags', 'source'],
+                   inplace=True)
+    df_kaggle['date'] = pd.to_datetime(df_kaggle['date']).dt.tz_localize('UTC')
+    date_start = df_tweets['date'].min()
+    date_end = df_tweets['date'].max()
+    mask_kaggle_dates = (df_kaggle['date'] < date_start) | (df_kaggle['date'] > date_end)
+    df_kaggle = df_kaggle[mask_kaggle_dates]
+    for col in ['retweet_count', 'reply_count', 'like_count', 'quote_count']:
+        df_kaggle[col] = -1
+
+    df_kaggle.to_csv('./data/kaggle_bitcoin_tweets_filtered.csv', index=False)
+
+#%% Combine tweet sources
+df_tweets_combined = pd.concat([df_tweets, df_kaggle], ignore_index=True)
+df_tweets_combined.reset_index(drop=True, inplace=True)
+out_path = Path(tabular_folder + 'tweets_combined.csv')
+df_tweets_combined.to_csv(out_path, index=False)
 #%% Test joining stock info onto bitcoin by nearest hourly value.
 
+def merge_index_into_crypto(df_crypto, index_frames: list):
+    df_crypto.sort_values(by='date', inplace=True)
+    df_merged = pd.merge_asof(df_crypto, index_frames[0], on='date', tolerance=pd.Timedelta("1h"))
+    df_merged = pd.merge_asof(df_merged, index_frames[1], on='date', tolerance=pd.Timedelta("1h"))
+    df_merged = pd.merge_asof(df_merged, index_frames[1], on='date', tolerance=pd.Timedelta("1h"))
+
+    return df_merged
+
 # This works well, but there are duplicate column names (open etc.)
-df_bitcoin_hourly.sort_values(by='date', inplace=True)
-df_btc_sp_merged = pd.merge_asof(df_bitcoin_hourly, df_s_and_p_hourly, on='date', tolerance=pd.Timedelta("1h"))
+index_frames = [df_s_and_p_hourly, df_nasdaq_hourly, df_dowjones_hourly]
+df_btc_market_indices_merged = merge_index_into_crypto(df_bitcoin_hourly, index_frames)
+df_eth_market_indices_merged = merge_index_into_crypto(df_ether_hourly, index_frames)
+df_sol_market_indices_merged = merge_index_into_crypto(df_sol, index_frames)
+df_link_market_indices_merged = merge_index_into_crypto(df_link, index_frames)
+df_usdc_market_indices_merged = merge_index_into_crypto(df_usdc, index_frames)
+
+coin_suffixes = ['BTC', 'ETH', 'SOL', 'LINK', 'USDC']
+for df_curr, suffix in zip([df_btc_market_indices_merged, df_eth_market_indices_merged, df_sol_market_indices_merged, df_link_market_indices_merged, df_usdc_market_indices_merged], coin_suffixes):
+    filename = 'coin_index_vals_merged_{}.csv'.format(suffix)
+    outpath = Path(tabular_folder + filename)
+    df_curr.to_csv(outpath, index=False)
+
 
 #%% Testing sentiment model

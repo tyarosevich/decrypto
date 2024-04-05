@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 from time import time
 #%%
-path = Path(r'/home/tyarosevich/Projects/decrypto/data/raw_tweets_202208131844.csv')
+path = Path(r'/home/tyarosevich/Projects/deploy/data/raw_tweets_202208131844.csv')
 df_test_tweets = pd.read_csv(path, low_memory=False)
 
 

@@ -12,18 +12,18 @@ logging.getLogger().setLevel(logging.INFO)
 
 def get_db_engine():
 
-    db_secrets = get_secret('decrypto-db-secrets')
+    db_secrets = get_secret('deploy-db-secrets')
     dct_auth = json.loads(db_secrets['SecretString'])
     db_login = dct_auth['username']
     db_pword = dct_auth['password']
     # dct_conn_args = {
     #     # "ssl": {
-    #     'ssl_ca': '/home/tyarosevich/Documents/access/decrypto-db.pem'
+    #     'ssl_ca': '/home/tyarosevich/Documents/access/deploy-db.pem'
     #     # }
     # }
     host = dct_auth['host']
     host = '{}{}'.format(host, ':3306')
-    db_name = "decrypto"
+    db_name = "deploy"
     conn_string = "mysql+pymysql://{}:{}@{}/{}".format(db_login, db_pword, host, db_name)
 
     # return create_engine(conn_string, connect_args=dct_conn_args)

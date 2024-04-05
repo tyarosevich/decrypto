@@ -1,9 +1,9 @@
-from decrypto.twitter_search import get_tweets, get_start_stop, tweet_handler
+from deploy.twitter_search import get_tweets, get_start_stop, tweet_handler
 import pandas as pd
 import tweepy
 import json
-from decrypto.aws_resources import get_secret
-from decrypto.db_resources import get_db_engine, db_write
+from deploy.aws_resources import get_secret
+from deploy.db_resources import get_db_engine, db_write
 
 def lambda_handler(event, context):
 

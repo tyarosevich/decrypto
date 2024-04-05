@@ -1,10 +1,16 @@
+'''
+In theory, this stuff only has to be done once since any future data will come from automated collection in the cloud or
+entirely novel local sources. As such, I made no effort to clean this up.
+'''
+
+
 import pandas as pd
 from pathlib import Path
 import os
 
 #%%
 
-# tabular_folder = '/home/tyarosevich/Projects/decrypto/data/'
+# tabular_folder = '/home/tyarosevich/Projects/deploy/data/'
 tabular_folder = './data/' # If using container (project root is automatically mounted).
 lookup_path = Path(tabular_folder + 'crypto_lookup_202304251523.csv')
 crypto_prices_path = Path(tabular_folder + 'raw_crypto_prices_202304251523.csv')
@@ -89,7 +95,33 @@ df_tweets_combined = pd.concat([df_tweets, df_kaggle], ignore_index=True)
 df_tweets_combined.reset_index(drop=True, inplace=True)
 out_path = Path(tabular_folder + 'tweets_combined.csv')
 df_tweets_combined.to_csv(out_path, index=False)
-#%% Test joining stock info onto bitcoin by nearest hourly value.
+#%% Test joining stock info onto bitcoin by nearest hourly value, as well as joining crypto values onto a target crypto frame.
+coin_suffixes = ['BTC', 'ETH', 'SOL', 'LINK', 'USDC']
+all_crypto_frames = [df_bitcoin_hourly, df_ether_hourly, df_sol, df_link, df_usdc]
+# Iterate through all the crypto frames, merging all OTHER crypto closing values by nearest date onto each
+# crypto frame.
+def merge_crypto_vals(all_frames, suffixes):
+
+    out_frames = []
+    for i in range(len(all_frames)):
+        temp_frames = [all_frames[j] for j in range(len(all_frames)) if j != i]
+        temp_suffixes = [suffixes[j] for j in range(len(suffixes)) if j != i]
+
+        df_main = all_frames[i]
+        df_main.sort_values(by=['date'], inplace=True)
+        for df_other, curr_suffix in zip(temp_frames, temp_suffixes):
+            df_other = df_other[['date', 'close']].copy()
+            df_other.rename(columns={'close': 'close_' + curr_suffix}, inplace=True)
+            df_other.sort_values(by=['date'], inplace=True)
+            df_main = pd.merge_asof(df_main, df_other, on='date', tolerance=pd.Timedelta('1h'))
+
+        out_frames.append(df_main)
+
+    return out_frames
+
+
+all_crypto_frames = merge_crypto_vals(all_crypto_frames, coin_suffixes)
+df_bitcoin_hourly, df_ether_hourly, df_sol, df_link, df_usdc = all_crypto_frames
 
 def merge_index_into_crypto(df_crypto, index_frames: list):
     df_crypto.sort_values(by='date', inplace=True)
@@ -99,7 +131,7 @@ def merge_index_into_crypto(df_crypto, index_frames: list):
 
     return df_merged
 
-# This works well, but there are duplicate column names (open etc.)
+# Merge the nearest-by-timestamp index values onto the crypto dataframes.
 index_frames = [df_s_and_p_hourly, df_nasdaq_hourly, df_dowjones_hourly]
 df_btc_market_indices_merged = merge_index_into_crypto(df_bitcoin_hourly, index_frames)
 df_eth_market_indices_merged = merge_index_into_crypto(df_ether_hourly, index_frames)
@@ -107,11 +139,8 @@ df_sol_market_indices_merged = merge_index_into_crypto(df_sol, index_frames)
 df_link_market_indices_merged = merge_index_into_crypto(df_link, index_frames)
 df_usdc_market_indices_merged = merge_index_into_crypto(df_usdc, index_frames)
 
-coin_suffixes = ['BTC', 'ETH', 'SOL', 'LINK', 'USDC']
 for df_curr, suffix in zip([df_btc_market_indices_merged, df_eth_market_indices_merged, df_sol_market_indices_merged, df_link_market_indices_merged, df_usdc_market_indices_merged], coin_suffixes):
     filename = 'coin_index_vals_merged_{}.csv'.format(suffix)
     outpath = Path(tabular_folder + filename)
     df_curr.to_csv(outpath, index=False)
 
-
-#%% Testing sentiment model

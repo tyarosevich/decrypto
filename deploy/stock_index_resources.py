@@ -6,7 +6,7 @@ import pandas as pd
 api_key = None
 
 # Load all stock index info for this API.
-path_stock_indexes = '/home/tyarosevich/Projects/decrypto/data/stock_index_codes.json'
+path_stock_indexes = '/home/tyarosevich/Projects/deploy/data/stock_index_codes.json'
 with open(path_stock_indexes)as json_file:
     lst_stock_indexes_all = json.load(json_file)['majorIndexesList']
 
@@ -91,7 +91,7 @@ df_result = pd.DataFrame(result)
 #%%
 
 df_symbol_lookup = df_result[['symbol', 'name']]
-out_path = Path('~/Projects/decrypto/temp/index_lookup_table.csv')
+out_path = Path('~/Projects/deploy/temp/index_lookup_table.csv')
 df_symbol_lookup.to_csv(out_path, index=False, encoding = 'utf8')
 
 #%%

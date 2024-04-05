@@ -5,9 +5,9 @@ from sqlalchemy import create_engine
 import pandas as pd
 import mariadb
 import pymysql
-from decrypto.aws_resources import get_secret
+from deploy.aws_resources import get_secret
 import json
-from decrypto.twitter_search import tweet_handler
+from deploy.twitter_search import tweet_handler
 import numpy as np
 #%%
 decrypto_secrets = get_secret()
@@ -17,11 +17,11 @@ db_pword = dct_auth['decrypto_db_pword']
 
 dct_conn_args = {
     "ssl": {
-        'ssl_ca': '/home/tyarosevich/Documents/access/decrypto-db.pem'
+        'ssl_ca': '/home/tyarosevich/Documents/access/deploy-db.pem'
     }
 }
 #%%
-conn_string = "mariadb+pymysql://{}:{}@decrypto-db.cmspnvwujzak.us-west-2.rds.amazonaws.com/decrypto?charset=utf8mb4".format(db_login,
+conn_string = "mariadb+pymysql://{}:{}@deploy-db.cmspnvwujzak.us-west-2.rds.amazonaws.com/deploy?charset=utf8mb4".format(db_login,
                                                                                                                db_pword)
 engine = create_engine(conn_string, connect_args=dct_conn_args)
 
@@ -38,11 +38,11 @@ df_final.to_sql(table, engine, index=False, if_exists='append')
 #%% PUre python
 dct_conn_args = {
     # "ssl": {
-        'ssl_ca': '/home/tyarosevich/Documents/access/decrypto-db.pem'
+        'ssl_ca': '/home/tyarosevich/Documents/access/deploy-db.pem'
     # }
 }
-host = "decrypto-db.cmspnvwujzak.us-west-2.rds.amazonaws.com:3306"
-db_name = "decrypto"
+host = "deploy-db.cmspnvwujzak.us-west-2.rds.amazonaws.com:3306"
+db_name = "deploy"
 conn_string = "mysql+mysqlconnector://{}:{}@{}/{}".format(db_login, db_pword, host, db_name)
 engine = create_engine(conn_string, connect_args=dct_conn_args)
 sql_query = "SELECT * from raw_tweets;"
@@ -72,11 +72,11 @@ def get_db_engine():
     db_pword = dct_auth['decrypto_db_pword']
     dct_conn_args = {
         # "ssl": {
-        'ssl_ca': '/home/tyarosevich/Documents/access/decrypto-db.pem'
+        'ssl_ca': '/home/tyarosevich/Documents/access/deploy-db.pem'
         # }
     }
-    host = "decrypto-db.cmspnvwujzak.us-west-2.rds.amazonaws.com:3306"
-    db_name = "decrypto"
+    host = "deploy-db.cmspnvwujzak.us-west-2.rds.amazonaws.com:3306"
+    db_name = "deploy"
     conn_string = "mysql+mysqlconnector://{}:{}@{}/{}".format(db_login, db_pword, host, db_name)
 
     return create_engine(conn_string, connect_args=dct_conn_args)

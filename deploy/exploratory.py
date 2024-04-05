@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import tweepy
 import json
-from decrypto.aws_resources import get_secret
+from deploy.aws_resources import get_secret
 from datetime import datetime
 from datetime import timedelta
 import pytz

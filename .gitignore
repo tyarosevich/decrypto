@@ -1,11 +1,11 @@
 env/
 .env
 decrypto_env/
-decrypto/__pycache__/
+deploy/__pycache__/
 .idea/
 tweepy_env/
-lambda_resources/lambda_layer_envs/
-lambda_resources/lambda_deployment_package/
+deploy/deploy_resources/lambda_resources/lambda_layer_envs/
+deploy/deploy_resources/lambda_resources/lambda_deployment_package/
 data/
 temp/
 env_decrypto/

@@ -93,6 +93,9 @@ else:
 #%% Combine tweet sources
 df_tweets_combined = pd.concat([df_tweets, df_kaggle], ignore_index=True)
 df_tweets_combined.reset_index(drop=True, inplace=True)
+dct_dtypes = {'id': int, 'text': str, 'lang': str, 'retweet_count': int, 'reply_count': int, 'like_count': int, 'quote_count': int}
+df_tweets_combined['id'].fillna(-1, inplace=True)
+df_tweets_combined = df_tweets_combined.astype(dct_dtypes)
 out_path = Path(tabular_folder + 'tweets_combined.csv')
 df_tweets_combined.to_csv(out_path, index=False)
 #%% Test joining stock info onto bitcoin by nearest hourly value, as well as joining crypto values onto a target crypto frame.

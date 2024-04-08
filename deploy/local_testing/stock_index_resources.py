@@ -91,7 +91,7 @@ df_result = pd.DataFrame(result)
 #%%
 
 df_symbol_lookup = df_result[['symbol', 'name']]
-out_path = Path('~/Projects/deploy/temp/index_lookup_table.csv')
+out_path = Path('~/Projects/deploy/efs_layer_zips/index_lookup_table.csv')
 df_symbol_lookup.to_csv(out_path, index=False, encoding = 'utf8')
 
 #%%

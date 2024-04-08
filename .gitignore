@@ -7,7 +7,7 @@ tweepy_env/
 deploy/deploy_resources/lambda_resources/lambda_layer_envs/
 deploy/deploy_resources/lambda_resources/lambda_deployment_package/
 data/
-temp/
+efs_layer_zips/
 env_decrypto/
 project_notes.txt
 

@@ -85,12 +85,14 @@ else:
     date_end = df_tweets['date'].max()
     mask_kaggle_dates = (df_kaggle['date'] < date_start) | (df_kaggle['date'] > date_end)
     df_kaggle = df_kaggle[mask_kaggle_dates]
-    for col in ['retweet_count', 'reply_count', 'like_count', 'quote_count']:
+    for col in ['retweet_count', 'reply_count', 'like_count', 'quote_count', 'id']:
         df_kaggle[col] = -1
+    df_kaggle['lang'] = 'en'
 
     df_kaggle.to_csv('./data/kaggle_bitcoin_tweets_filtered.csv', index=False)
 
 #%% Combine tweet sources
+df_kaggle = df_kaggle[df_tweets.columns]
 df_tweets_combined = pd.concat([df_tweets, df_kaggle], ignore_index=True)
 df_tweets_combined.reset_index(drop=True, inplace=True)
 dct_dtypes = {'id': int, 'text': str, 'lang': str, 'retweet_count': int, 'reply_count': int, 'like_count': int, 'quote_count': int}

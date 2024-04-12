@@ -8,13 +8,13 @@ from time import time
 import numpy as np
 
 # Load the historical tweet file
-path_tweets = Path('./data/tweets_combined.csv')
+path_tweets = Path('data/tweets_combined.csv')
 dct_dtypes = {'id': int, 'text': str, 'lang': str, 'date': str, 'retweet_count': int, 'reply_count': int, 'like_count': int, 'quote_count': int}
 # Had to load in chunks with the python engine because reasons.
 chunk_size = 100000
 start = time()
 df_tweets = pd.DataFrame()
-for chunk in pd.read_csv(path_tweets, chunksize=chunk_size, engine='python'):
+for chunk in pd.read_csv(path_tweets, chunksize=chunk_size, engine='python', parse_dates=['date']):
     # inner_start = time()
     df_tweets = pd.concat([df_tweets, chunk])
     # inner_end = time()
@@ -27,11 +27,13 @@ thresh_retweet = 1000
 mask_retweet_thresh = df_tweets['retweet_count'] > thresh_retweet
 print("{} tweets above threshold.".format(mask_retweet_thresh.sum()))
 df_tweets = df_tweets[mask_retweet_thresh]
+tweets_thresh_path = Path('data/tweets_filt_retweet_thresh.csv')
+df_tweets.to_csv(tweets_thresh_path, index=False)
 
 #%% Process the retweet thresholded text and get accompanying token embeddings. Originally set this up to batch
 #   but when I realized the gpu was not default, it became tractable to do it all at once (2.5 hours).
-sent_file = Path('./data/sentiment_historical.pkl')
-token_file = Path('./data/tokens_historical.pkl')
+sent_file = Path('../../data/sentiment_historical.pkl')
+token_file = Path('../../data/tokens_historical.pkl')
 
 token_size = 64
 
@@ -51,7 +53,7 @@ if flag_batch_process:
     # Find the first nan, i.e. where to start processing.
     idx_start = np.where(np.isnan(sent_processed))[0][0]
     # Something like .0035s per tweet (gpu).
-    process_chunk_sz = 200000
+    process_chunk_sz = 100
     idx_end = idx_start + process_chunk_sz
     if idx_end > sent_processed.shape[0]:
         idx_end = sent_processed.shape[0]
@@ -67,7 +69,7 @@ output_batch = sentiment_pipeline(tweet_batch)
 end = time()
 print("Processing {} tweets took {} seconds".format(process_chunk_sz, end - start))
 df_output = pd.DataFrame(output_batch)
-token_output = sentiment_pipeline.tokenizer(tweet_batch, max_length=token_size)
+token_output = sentiment_pipeline.tokenizer(tweet_batch, max_length=token_size, truncation=True, padding=True)
 
 # Process batch or process everything.
 if flag_batch_process:
@@ -75,13 +77,13 @@ if flag_batch_process:
     token_output = [np.resize(np.array(enc.ids), token_size) for enc in token_output.encodings]
     assert(len(token_output) == df_output.shape[0])
     token_output = np.array(token_output)
-    token_output = np.concatenate([token_processed, token_output])
+    token_output = np.concatenate([token_processed, token_output]).astype(int)
     print("Chunk done!")
 else:
     sent_processed = df_output['score'].to_numpy()
     token_output = [np.resize(np.array(enc.ids), token_size) for enc in token_output.encodings]
     assert(len(token_output) == len(sent_processed))
-    token_processed = np.array(token_output)
+    token_processed = np.array(token_output).astype(int)
 
 # Save intermediate object.
 pd.to_pickle(sent_processed, sent_file)

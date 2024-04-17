@@ -1,7 +1,6 @@
 from pathlib import Path
 import pandas as pd
 from transformers import pipeline
-sentiment_pipeline = pipeline(model="cardiffnlp/twitter-roberta-base-sentiment-latest", device=0)
 from torch.cuda import is_available
 assert(is_available())
 from time import time
@@ -24,30 +23,34 @@ end = time()
 print('Total processing time = {}s'.format(end - start))
 
 thresh_retweet = 1000
-mask_retweet_thresh = df_tweets['retweet_count'] > thresh_retweet
+mask_retweet_thresh = (df_tweets['retweet_count'] > thresh_retweet) | (df_tweets['retweet_count'] == -1)
 print("{} tweets above threshold.".format(mask_retweet_thresh.sum()))
 df_tweets = df_tweets[mask_retweet_thresh]
+df_tweets['date'] = pd.to_datetime(df_tweets['date'])
 tweets_thresh_path = Path('data/tweets_filt_retweet_thresh.csv')
 df_tweets.to_csv(tweets_thresh_path, index=False)
 
 #%% Process the retweet thresholded text and get accompanying token embeddings. Originally set this up to batch
 #   but when I realized the gpu was not default, it became tractable to do it all at once (2.5 hours).
-sent_file = Path('../../data/sentiment_historical.pkl')
-token_file = Path('../../data/tokens_historical.pkl')
+sent_file = Path('data/sentiment_historical.pkl')
+token_file = Path('data/tokens_historical.pkl')
 
 token_size = 64
+flag_batch_process = False
+
+sentiment_pipeline = pipeline(model="cardiffnlp/twitter-roberta-base-sentiment-latest", device=0)
 
 if sent_file.is_file() and token_file.is_file():
     sent_processed = pd.read_pickle(sent_file)
     token_processed = pd.read_pickle(token_file)
     print("Existing files, loading.")
 else:
-    sent_processed = np.empty((df_tweets.shape[0],))
-    sent_processed.fill(np.nan)
-    token_processed = np.empty((0, token_size))
-    print("No processing files, creating new ones")
+    if flag_batch_process:
+        sent_processed = np.empty((df_tweets.shape[0],))
+        sent_processed.fill(np.nan)
+        token_processed = np.empty((0, token_size))
 
-flag_batch_process = False
+    print("No processing files, creating new ones")
 
 if flag_batch_process:
     # Find the first nan, i.e. where to start processing.
@@ -65,7 +68,7 @@ else:
     tweet_batch = df_tweets['text'].to_list()
 
 start = time()
-output_batch = sentiment_pipeline(tweet_batch)
+output_batch = sentiment_pipeline(tweet_batch, max_length=512, truncation=True, padding=True)
 end = time()
 print("Processing {} tweets took {} seconds".format(process_chunk_sz, end - start))
 df_output = pd.DataFrame(output_batch)

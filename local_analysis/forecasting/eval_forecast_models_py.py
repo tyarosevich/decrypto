@@ -67,6 +67,7 @@ print('Time taken to create date_pairs single-thread: {}'.format(end - start))
 
 # Let's multiprocess it
 import multiprocessing as mp
+import functools
 import local_analysis.forecasting.utils_multiprocess as utils_multiprocess
 num_cores = mp.cpu_count() - 2
 tweet_dates = df_tweets['date'].to_numpy()
@@ -86,8 +87,13 @@ except FileExistsError:
     utils_multiprocess.release_shared(NP_SHARED_NAME)
     shm = utils_multiprocess.create_shared_memory_nparray(tweet_dates)
 
+runner = functools.partial(utils_multiprocess.get_date_mask, array_shape = tweet_dates.shape)
+
+# So this isn't working, some kind of typecasting is happening with the datetime objects. Either try doing the whole shebang with
+# unix time or see if there's a way to do a list to shared memory (kinda doubt it, I think numpy arrys are special because of
+# contiguous memory).
 start = time()
 with mp.Pool(processes=num_cores) as pool:
-    processed = pool.map(utils_multiprocess.get_date_mask, date_pairs)
+    processed = pool.map(runner, date_pairs)
 end = time()
 print('Time taken to create date_pairs with multiprocess: {}'.format(end - start))

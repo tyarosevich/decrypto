@@ -13,6 +13,10 @@ def par_sent_feature_extract(all_dates: np.ndarray, df_tweets: pd.DataFrame, set
     all_dates = list(zip(all_dates, all_dates + timedelta(minutes=59, seconds=59)))
 
     num_cores = mp.cpu_count() - 2
+    # TODO: Note that I have no idea how the views to dataframe slices will be handled by multiproc. At best, I assume
+    #       it would have to pass in the entire dataframe? Gathering slices has the same problem, so maybe it's still
+    #       best to just pass in the entire dataframe as a copy? Though, collecting the slices in a list would be 2*n
+    #       memory, whereas passing in the entire dataframe would be m*n where m = processes?
     with mp.Pool(processes=num_cores) as pool:
         dct_sent_processed = pool.map(lambda item: run_extract_sent_and_token_feats(item, df_tweets, settings), all_dates)
 
@@ -21,10 +25,10 @@ def par_sent_feature_extract(all_dates: np.ndarray, df_tweets: pd.DataFrame, set
 def run_extract_sent_and_token_feats(date_range: dict, df_tweets: pd.DataFrame, settings: dict) -> dict:
 
     mask_dates = np.where((df_tweets['date'] >= date_range[0]) & (df_tweets['date'] <= date_range[1]))
-    sent_vals = df_tweets['sentiment'][mask_dates]
+    sent_vals = df_tweets['single_val_sent'][mask_dates]
     tokens = df_tweets['tokens'][mask_dates]
 
-    sent_feats = extract_sent_feats(sent_vals, settings['sentiment'])
+    sent_feats = extract_sent_feats(sent_vals, settings['single_val_sent'])
     token_feats = extract_token_feats(tokens, settings['tokens'])
 
     return {'date': date_range[0], 'sent_vals': sent_vals, 'sent_feats': sent_feats, 'token_feats': token_feats}

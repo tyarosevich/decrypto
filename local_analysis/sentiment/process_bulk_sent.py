@@ -27,6 +27,11 @@ mask_retweet_thresh = (df_tweets['retweet_count'] > thresh_retweet) | (df_tweets
 print("{} tweets above threshold.".format(mask_retweet_thresh.sum()))
 df_tweets = df_tweets[mask_retweet_thresh]
 df_tweets['date'] = pd.to_datetime(df_tweets['date'])
+
+# Sort all tweets
+df_tweets.sort_values(by='date', inplace=True)
+df_tweets.reset_index(drop=True, inplace=True)
+
 tweets_thresh_path = Path('data/tweets_filt_retweet_thresh.csv')
 df_tweets.to_csv(tweets_thresh_path, index=False)
 
@@ -36,6 +41,7 @@ sent_file = Path('data/sentiment_historical.pkl')
 token_file = Path('data/tokens_historical.pkl')
 
 token_size = 64
+# TODO: Batch processing needs updating if you want to use it.
 flag_batch_process = False
 
 sentiment_pipeline = pipeline(model="cardiffnlp/twitter-roberta-base-sentiment-latest", device=0)
@@ -70,7 +76,7 @@ else:
 start = time()
 output_batch = sentiment_pipeline(tweet_batch, max_length=512, truncation=True, padding=True)
 end = time()
-print("Processing {} tweets took {} seconds".format(process_chunk_sz, end - start))
+print("Processing tweets took {} seconds".format(end - start))
 df_output = pd.DataFrame(output_batch)
 token_output = sentiment_pipeline.tokenizer(tweet_batch, max_length=token_size, truncation=True, padding=True)
 
@@ -83,11 +89,24 @@ if flag_batch_process:
     token_output = np.concatenate([token_processed, token_output]).astype(int)
     print("Chunk done!")
 else:
-    sent_processed = df_output['score'].to_numpy()
+    # sent_processed = df_output['score'].to_numpy()
     token_output = [np.resize(np.array(enc.ids), token_size) for enc in token_output.encodings]
-    assert(len(token_output) == len(sent_processed))
+    assert(len(token_output) == df_output.shape[0])
     token_processed = np.array(token_output).astype(int)
+    df_output['tokens'] = token_processed.tolist()
+    df_tweets_and_sent = pd.concat([df_tweets, df_output], axis=1)
 
 # Save intermediate object.
-pd.to_pickle(sent_processed, sent_file)
-pd.to_pickle(token_processed, token_file)
+# pd.to_pickle(sent_processed, sent_file)
+# pd.to_pickle(token_processed, token_file)
+
+tweet_sent_file_csv = Path('data/tweets_and_sent.csv')
+start = time()
+df_tweets_and_sent.to_csv(tweet_sent_file_csv, index=False)
+end = time()
+print("Saving took {} seconds".format(end - start))
+tweet_sent_file = Path('data/tweets_and_sent.parquet')
+start = time()
+df_tweets_and_sent.to_parquet(tweet_sent_file, engine='pyarrow') # Memory leak bug with pyarrow?
+end = time()
+print("Saving took {} seconds".format(end - start))

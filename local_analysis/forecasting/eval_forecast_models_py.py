@@ -97,3 +97,20 @@ with mp.Pool(processes=num_cores) as pool:
     processed = pool.map(runner, date_pairs)
 end = time()
 print('Time taken to create date_pairs with multiprocess: {}'.format(end - start))
+
+
+#%% Test LSTM
+from local_analysis.forecasting.models import forecast_lstm
+from importlib import reload
+reload(forecast_lstm)
+
+btc_timeseries = df_bitcoin['close']
+train_size = int(len(btc_timeseries) * 0.9)
+test_size = int(len(btc_timeseries) * 0.1)
+train, test = btc_timeseries[0:train_size], btc_timeseries[train_size:]
+
+stride = 24
+epochs = 1000
+batch_size = 32
+
+trained_model = forecast_lstm.run_lstm_training(train, test, stride, epochs, batch_size, 'cuda')

@@ -3,44 +3,79 @@ import numpy as np
 from datetime import timedelta
 import multiprocessing as mp
 from scipy.stats import moment as scipy_moment
+import local_analysis.forecasting.utils_multiprocess as utils_mp
+from functools import partial as func_partial
+from multiprocessing import shared_memory
 
-def par_sent_feature_extract(all_dates: np.ndarray, df_tweets: pd.DataFrame, settings: dict) -> dict:
-    # So basically this needs to take in a tuple of dates from a list of such tuples, and the tweet data frame,
-    # mask out the relevant tweet rows, and then do some processing on them, we would then return a dict with the results
-    # and the starting timestamp (in order to sync up with the coin frame).
 
-    # The dates in 59m59s blocks.
-    all_dates = list(zip(all_dates, all_dates + timedelta(minutes=59, seconds=59)))
+def multiprocess_feature_extract(date_pair_data: list, sent_scores: np.ndarray, mat_tokens: np.ndarray,
+                                 settings: dict) -> dict:
+    """
+    Maps feature extraction results to a pair of timestamp ranges which correspond to a row of crypto data (an hour
+    timespan).
+    Parameters
+    ----------
+    date_pair_masks: list
+        A list of dicts containing starting datetime objects and associated 1 hour masks for the tweet data.
+    sent_scores: numpy.ndarray
+        The tweet scores in a range [-1, 1].
+    mat_tokens: numpy.ndarray
+        The tweet tokens, restricted to M context.
+    settings: dict
+        The various settings for feature extraction. This is the interface for adding new feature types via the factory.
 
+    Returns
+    -------
+    dict
+        The feature extraction results. The dict also contains the start timestamp, which should be keyed to the crypto
+        data.
+    """
     num_cores = mp.cpu_count() - 2
-    # TODO: Note that I have no idea how the views to dataframe slices will be handled by multiproc. At best, I assume
-    #       it would have to pass in the entire dataframe? Gathering slices has the same problem, so maybe it's still
-    #       best to just pass in the entire dataframe as a copy? Though, collecting the slices in a list would be 2*n
-    #       memory, whereas passing in the entire dataframe would be m*n where m = processes?
+
+    SENT_SCORES_SHARED_MEM_NAME = 'sent_scores_shared_mem'
+    TOKENS_SHARED_MEM_NAME = 'tokens_shared_mem'
+    shm_sent = utils_mp.create_shared_memory_nparray(sent_scores, SENT_SCORES_SHARED_MEM_NAME)
+    shm_tokens = utils_mp.create_shared_memory_nparray(mat_tokens, TOKENS_SHARED_MEM_NAME)
+
+    runner = func_partial(_run_extract_sent_and_token_feats, SENT_SCORES_SHARED_MEM_NAME, TOKENS_SHARED_MEM_NAME, settings)
+
     with mp.Pool(processes=num_cores) as pool:
-        dct_sent_processed = pool.map(lambda item: run_extract_sent_and_token_feats(item, df_tweets, settings), all_dates)
+        dct_sent_processed = pool.map(runner, date_pair_data)
+
+    # If memory isn't release properly, it can cause a system crash.
+    utils_mp.release_shared(SENT_SCORES_SHARED_MEM_NAME)
+    utils_mp.release_shared(TOKENS_SHARED_MEM_NAME)
 
     return dct_sent_processed
 
-def run_extract_sent_and_token_feats(date_range: dict, df_tweets: pd.DataFrame, settings: dict) -> dict:
+def _run_extract_sent_and_token_feats(date_pair_data: dict, SHM_SENT_NAME: str, SHM_TOKEN_NAME: str,
+                                      sent_array_shape: tuple, tokens_array_shape: tuple, settings: dict) -> dict:
 
-    mask_dates = np.where((df_tweets['date'] >= date_range[0]) & (df_tweets['date'] <= date_range[1]))
-    sent_vals = df_tweets['single_val_sent'][mask_dates]
-    tokens = df_tweets['tokens'][mask_dates]
+    date_pair = date_pair_data['date_pair']
+    date_start = date_pair_data['date_start']
 
-    sent_feats = extract_sent_feats(sent_vals, settings['single_val_sent'])
-    token_feats = extract_token_feats(tokens, settings['tokens'])
+    shm_sent = shared_memory.SharedMemory(name=SHM_SENT_NAME)
+    shm_tokens = shared_memory.SharedMemory(name=SHM_TOKEN_NAME)
+    vec_sent_vals = np.ndarray(sent_array_shape, dtype=np.float64, buffer=shm_sent.buf)
+    mat_tokens = np.ndarray(tokens_array_shape, dtype=np.float64, buffer=shm_tokens.buf)
 
-    return {'date': date_range[0], 'sent_vals': sent_vals, 'sent_feats': sent_feats, 'token_feats': token_feats}
+    sent_feats = _extract_sent_feats(vec_sent_vals, settings['single_val_sent'])
+    token_feats = _extract_token_feats(mat_tokens, settings['tokens'])
 
-def extract_sent_feats(sent_vals: np.ndarray, settings: dict) -> dict:
+    # TODO: This is placeholder, needs more consideration.
+    sent_feats = _extract_sent_feats(vec_sent_vals, settings['sent_settings'])
+    token_feats = _extract_token_feats(mat_tokens, settings['tokens'])
+
+    return {'date': date_start[0], 'sent_vals': vec_sent_vals, 'sent_feats': sent_feats, 'token_feats': token_feats}
+
+def _extract_sent_feats(sent_vals: np.ndarray, settings: dict) -> dict:
     dct_return = {}
     for extract_type in settings['extract_types']:
-        fun_extract = feature_extract_factory(extract_type)
+        fun_extract = _feature_extract_factory(extract_type)
         dct_return[extract_type] = fun_extract(sent_vals)
 
     return dct_return
-def feature_extract_factory(extraction_type):
+def _feature_extract_factory(extraction_type):
     if extraction_type == 'mean':
         return np.mean
     if extraction_type == 'median':
@@ -50,14 +85,14 @@ def feature_extract_factory(extraction_type):
     if extraction_type == 'min':
         return np.min
     if extraction_type == 'moment':
-        return get_moments
+        return _get_moments
     if extraction_type == 'std':
         return np.std
     else:
         raise ValueError(f'Extraction type {extraction_type} not supported')
 
 
-def get_moments(vals: np.ndarray) -> dict:
+def _get_moments(vals: np.ndarray) -> dict:
     dict_return = {}
     moments = ['exp_val', 'variance', 'skewness', 'kurtosis']
     for i, moment in enumerate(moments):
@@ -65,7 +100,7 @@ def get_moments(vals: np.ndarray) -> dict:
 
     return dict_return
 
-def extract_token_feats(tokens: np.ndarray, settings: dict) -> dict:
+def _extract_token_feats(tokens: np.ndarray, settings: dict) -> dict:
     """
     Extract token features from tokens. Currently just returns the top N most common tokens.
     Parameters

@@ -92,17 +92,22 @@ else:
     # sent_processed = df_output['score'].to_numpy()
     token_output = [np.resize(np.array(enc.ids), token_size) for enc in token_output.encodings]
     assert(len(token_output) == df_output.shape[0])
-    token_processed = np.array(token_output).astype(int)
-    df_output['tokens'] = token_processed.tolist()
+    mat_tokens_processed = np.array(token_output).astype(int)
     df_tweets_and_sent = pd.concat([df_tweets, df_output], axis=1)
 
 # Save intermediate object.
 # pd.to_pickle(sent_processed, sent_file)
 # pd.to_pickle(token_processed, token_file)
 
-tweet_sent_file_csv = Path('data/tweets_and_sent.csv')
+dct_dtypes = {'id': int, 'text': str, 'lang': str, 'retweet_count': int, 'reply_count': int, 'like_count': int, 'quote_count': int}
+df_tweets = df_tweets.astype(dct_dtypes)
+
+tweet_sent_file_pkl = Path('data/tweets_and_sent.pickle')
+tokens_file = Path('data/tweet_tokens.pickle')
+pd.to_pickle(mat_tokens_processed, tokens_file)
 start = time()
-df_tweets_and_sent.to_csv(tweet_sent_file_csv, index=False)
+# df_tweets_and_sent.to_csv(tweet_sent_file_csv, index=False)
+pd.to_pickle(df_tweets_and_sent, tweet_sent_file_pkl)
 end = time()
 print("Saving took {} seconds".format(end - start))
 tweet_sent_file = Path('data/tweets_and_sent.parquet')

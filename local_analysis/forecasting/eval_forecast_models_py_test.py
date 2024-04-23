@@ -16,13 +16,11 @@ df_bitcoin = dct_coin_tables['BTC'] # A view to a table for inspection because V
 print(df_bitcoin.columns)
 
 #%%
-tweet_sent_file_csv = Path('data/tweets_and_sent.csv')
+tweet_sent_path =  Path('data/tweets_and_sent.pickle')
+tokens_file = Path('data/tweet_tokens.pickle')
 
-# Tweets need to be sorted appropriately, as I forgot to do it in the original processing.
-# TODO: Reprocess as sorted, I don't like it.
-df_tweets = pd.read_csv(tweet_sent_file_csv, parse_dates=['date'])
-df_tweets.reset_index(drop=True, inplace=True) # Not sure if I did this originally.
-
+df_tweets = pd.read_pickle(tweet_sent_path)
+mat_tokens = pd.read_pickle(tokens_file)
 print("Tweet and sentiment shape: {}".format(df_tweets.shape))
 
 
@@ -37,7 +35,7 @@ date_end = df_tweets['date'].max()
 mask_dates = (df_bitcoin['date'] >= date_start) & (df_bitcoin['date'] <= date_end)
 mask_dates = np.where(mask_dates.to_numpy())[0]
 print(len(mask_dates))
-
+# This is a view, be mindful of indices.
 df_bitcoin_post_tweets = df_bitcoin.iloc[mask_dates, :]
 
 #%% Produce a single sentiment column for analysis
@@ -58,19 +56,28 @@ df_tweets['single_val_sent'] = df_tweets['label'].map(sent_map)
 df_tweets['single_val_sent'] = df_tweets['single_val_sent'] * df_tweets['score']
 
 #%% Test getting masks
-one_second = timedelta(seconds=1)
-date_pairs = list(zip(df_bitcoin_post_tweets['date'].iloc[0:-2].to_numpy(), df_bitcoin_post_tweets['date'].iloc[1:].to_numpy() - one_second))
+
+# Convert bitcoin timestamps to posix, and get pairs of one hour minus 1s timespans for each row.
+btc_dates = df_bitcoin_post_tweets['date'].astype(int) / 10 ** 9
+btc_dates = btc_dates.astype(int).to_numpy()
+date_pairs = list(zip(btc_dates[0:-2], btc_dates[1:] - 1))
+
+tweet_dates = df_tweets['date'].astype(int) / 10 ** 9
+tweet_dates = tweet_dates.astype(int).to_numpy()
+
+# Create index lists for span of time against the tweet timestamps.
 start = time()
-date_pair_masks = [ np.where((df_tweets['date'] >= date_start) & (df_tweets['date'] <= date_end))[0] for date_start, date_end in date_pairs ]
+date_pair_masks = [ np.where((tweet_dates >= date_start) & (tweet_dates <= date_end))[0] for date_start, date_end in date_pairs ]
 end = time()
 print('Time taken to create date_pairs single-thread: {}'.format(end - start))
 
-# Let's multiprocess it
+#%%
+# Let's try with multiprocessing. Not particularly important for the date pair masks, but it probably will be for
+# feature extraction, and the same limitatiosn (needing to share a numpy array via shared mem) applies.
 import multiprocessing as mp
 import functools
 import local_analysis.forecasting.utils_multiprocess as utils_multiprocess
 num_cores = mp.cpu_count() - 2
-tweet_dates = df_tweets['date'].to_numpy()
 
 NP_SHARED_NAME = 'npshared'
 
@@ -82,7 +89,7 @@ NP_SHARED_NAME = 'npshared'
 #     return np.where( (tweet_dates >= date_range[0]) & (tweet_dates < date_range[1]))[0]
 
 try:
-    shm = utils_multiprocess.create_shared_memory_nparray(tweet_dates)
+    shm = utils_multiprocess.create_shared_memory_nparray(tweet_dates, NP_SHARED_NAME)
 except FileExistsError:
     utils_multiprocess.release_shared(NP_SHARED_NAME)
     shm = utils_multiprocess.create_shared_memory_nparray(tweet_dates)
@@ -97,7 +104,12 @@ with mp.Pool(processes=num_cores) as pool:
     processed = pool.map(runner, date_pairs)
 end = time()
 print('Time taken to create date_pairs with multiprocess: {}'.format(end - start))
+utils_multiprocess.release_shared(NP_SHARED_NAME)
 
+#%% So now we need to do feature extraction. This has to iterate over each mask, performing feature extraction on both
+#   the sentiment array and token matrix, which will need to be in shared mem (particularly the matrix, it's big).
+
+vec_sent = df_tweets['single_val_sent'].to_numpy()
 
 #%% Test LSTM
 from local_analysis.forecasting.models import forecast_lstm

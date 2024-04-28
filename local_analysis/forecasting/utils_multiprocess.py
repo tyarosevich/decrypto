@@ -7,19 +7,19 @@ import numpy as np
 import multiprocessing
 from concurrent.futures.process import ProcessPoolExecutor
 
-NUM_WORKERS = multiprocessing.cpu_count()
-np.random.seed(42)
-ARRAY_SIZE = int(2e8)
-ARRAY_SHAPE = (ARRAY_SIZE,)
-NP_SHARED_NAME = 'npshared'
-NP_DATA_TYPE = np.float64
-data = np.random.random(ARRAY_SIZE)
-
+# NUM_WORKERS = multiprocessing.cpu_count()
+# np.random.seed(42)
+# ARRAY_SIZE = int(2e8)
+# ARRAY_SHAPE = (ARRAY_SIZE,)
+# NP_SHARED_NAME = 'npshared'
+NP_DATA_TYPE = np.int64
+# data = np.random.random(ARRAY_SIZE)
 
 def create_shared_memory_nparray(input_data, shared_name):
-    # d_size = np.dtype(NP_DATA_TYPE).itemsize * np.prod(ARRAY_SHAPE)
 
-    shm = shared_memory.SharedMemory(create=True, size=input_data.nbytes, name=shared_name)
+    d_size = np.dtype(input_data.dtype).itemsize * np.prod(input_data.shape)
+
+    shm = shared_memory.SharedMemory(create=True, size=d_size, name=shared_name)
     # numpy array on shared memory buffer
     dst = np.ndarray(shape=input_data.shape, dtype=input_data.dtype, buffer=shm.buf)
     dst[:] = input_data[:]
@@ -38,8 +38,11 @@ def release_shared(name):
         raise e
 
 
-def get_date_mask(date_range: tuple, array_shape) -> np.ndarray:
-    shm = shared_memory.SharedMemory(name=NP_SHARED_NAME)
-    tweet_dates = np.ndarray(array_shape, dtype=NP_DATA_TYPE, buffer=shm.buf)
-    mask_output = np.where((tweet_dates >= date_range[0]) & (tweet_dates < date_range[1]))[0]
+def get_date_mask(date_range: tuple, args: tuple) -> np.ndarray:
+    array_shape, name, data_type = args
+    shm = shared_memory.SharedMemory(name=name)
+    tweet_dates = np.ndarray(array_shape, dtype=data_type, buffer=shm.buf)
+
+    mask_output = (tweet_dates >= date_range[0]) & (tweet_dates < date_range[1])
+
     return mask_output

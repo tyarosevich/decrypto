@@ -10,4 +10,4 @@ data/
 efs_layer_zips/
 env_decrypto/
 project_notes.txt
-
+*__pycache__/

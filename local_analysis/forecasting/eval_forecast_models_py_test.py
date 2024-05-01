@@ -52,9 +52,8 @@ print('Tweets %:\nPositive: {}\nNegative: {}\nNeutral: {}'.format(positive_cnt/d
 dct_sent_label_masks = {}
 sent_labels = ['negative', 'neutral', 'positive']
 for label in sent_labels:
-    mask_temp = df_tweets['label'] == label
-    dct_sent_label_masks[label] = mask_temp.to_numpy()
-
+    mask_temp = np.where(df_tweets['label'] == label)[0]
+    dct_sent_label_masks[label] = mask_temp
 # Neutral needs to be included in some way I think. Perhaps an entire second feature category with all the same moment type features
 # but just or neutral.
 # sent_map = {'negative': -1, 'neutral': 0, 'positive': 1}
@@ -64,88 +63,75 @@ for label in sent_labels:
 # # cursory analysis.
 # df_tweets['single_val_sent'] = df_tweets['single_val_sent'] * df_tweets['score']
 
-#%% Test getting masks
-
-# # Convert bitcoin timestamps to posix, and get pairs of one hour minus 1s timespans for each row.
-# btc_dates = df_bitcoin_post_tweets['date'].astype(int) / 10 ** 9
-# btc_dates = btc_dates.astype(int).to_numpy()
-# date_pairs = list(zip(btc_dates[0:-2], btc_dates[1:] - 1))
-#
-# tweet_dates = df_tweets['date'].astype(int) / 10 ** 9
-# tweet_dates = tweet_dates.astype(int).to_numpy()
-#
-# # Create index lists for span of time against the tweet timestamps.
-# start = time()
-# date_pair_masks_single_core = [ np.where((tweet_dates >= date_start) & (tweet_dates <= date_end))[0] for date_start, date_end in date_pairs ]
-# end = time()
-# print('Time taken to create date_pairs single-thread: {}'.format(end - start))
-
-#%%
-# Let's try with multiprocessing. Not particularly important for the date pair masks, but it probably will be for
-# feature extraction, and the same limitations (needing to share a numpy array via shared mem) applies.
-import multiprocessing as mp
-import functools
-import local_analysis.forecasting.utils_multiprocess as utils_multiprocess
+#%% Test getting masks with new generalized mp map wrapper.
+from local_analysis.forecasting import utils_multiprocess
 reload(utils_multiprocess)
-num_cores = mp.cpu_count() - 2
 
-# Convert bitcoin timestamps to posix, and get pairs of one hour minus 1s timespans for each row.
-btc_dates = df_bitcoin_post_tweets['date'].astype(int) / 10 ** 9
-btc_dates = btc_dates.astype(int).to_numpy()
-date_pairs = list(zip(btc_dates[0:-1], btc_dates[1:] - 1))
+def get_date_mask(date_range, dct_shared_data) -> np.ndarray:
 
-tweet_dates = df_tweets['date'].astype(int) / 10 ** 9
+    tweet_dates = dct_shared_data['tweet_dates']['ndarray']
+    mask_output = np.where((tweet_dates >= date_range[0]) & (tweet_dates < date_range[1]))[0]
+
+    return mask_output
+
+# To calculate the date-pairs we add something like 59m to each hourly start time.
+pair_starts = df_bitcoin_post_tweets['date'].astype('int64') / 10 ** 9
+pair_starts = pair_starts.astype(int).to_numpy()
+pair_ends = pair_starts + 59*60 + 59
+date_pairs = list(zip(pair_starts[0:-1], pair_ends[0:-1]))
+
+tweet_dates = df_tweets['date'].astype('int64') / 10 ** 9
 tweet_dates = tweet_dates.astype(int).to_numpy()
 
+shared_data = {'tweet_dates': tweet_dates}
+input_data = (date_pairs,)
+mp_settings = {'num_cores_kept_free': 2}
 
-# Critical shared mem parameters that must be consistent across processes.
-NP_SHARED_NAME = 'npshared'
-NP_SHARED_TYPE = np.int64
-assert(tweet_dates.dtype == NP_SHARED_TYPE)
+start = time()
+date_pair_masks_multicore = utils_multiprocess.run_shared_mem_multiproc_map(input_data, get_date_mask, shared_data, mp_settings)
+end = time()
+print('Time taken to run multiprocessing map: {} seconds'.format(end - start))
 
-try:
-    shm = utils_multiprocess.create_shared_memory_nparray(tweet_dates, NP_SHARED_NAME)
-except FileExistsError:
-    utils_multiprocess.release_shared(NP_SHARED_NAME)
-    shm = utils_multiprocess.create_shared_memory_nparray(tweet_dates)
+#### IN CASE OF MP ISSUES #####
+# #%% Test getting masks
+#
+# # To calculate the date-pairs we add something like 59m to each hourly start time.
+# pair_starts = df_bitcoin_post_tweets['date'].astype('int64') / 10 ** 9
+# pair_starts = pair_starts.astype(int).to_numpy()
+# pair_ends = pair_starts + 59*60 + 59
+# date_pairs = list(zip(pair_starts[0:-1], pair_ends[0:-1]))
+#
+# tweet_dates = df_tweets['date'].astype('int64') / 10 ** 9
+# tweet_dates = tweet_dates.astype(int).to_numpy()
+# test_pairs = date_pairs[0:1000]
+# # Create index lists for span of time against the tweet timestamps.
+# start = time()
+# # Have to go np.where. The sparse boolean matrices are just too big.
+# date_pair_masks_single_core = [np.where((tweet_dates >= date_start) & (tweet_dates <= date_end))[0] for date_start, date_end in date_pairs]
+# end = time()
+# print('Time taken to create date_pairs single-thread: {}'.format(end - start))
+##################################
 
-runner = functools.partial(utils_multiprocess.get_date_mask, args=(tweet_dates.shape, NP_SHARED_NAME, NP_SHARED_TYPE))
-
-# WARNING: Running this twice, even after releasing the shared memory, causes a 7:SIGBUS error. Something weird is up.
-# Could be Pycharm related.
-try:
-    start = time()
-    with mp.Pool(processes=num_cores) as pool:
-        date_pair_masks_multicore = pool.map(runner, date_pairs)
-    end = time()
-    print('Time taken to create date_pairs with multiprocess: {}'.format(end - start))
-except Exception as e:
-    raise e
-finally:
-    try:
-        shm = mp.shared_memory.SharedMemory(name=NP_SHARED_NAME)
-        shm.close()
-        shm.unlink()  # Free and release the shared memory block
-        print('Shared memory "{}" is hypothetically released'.format(NP_SHARED_NAME))
-    except Exception as e:
-        print("Failed to release the shared memory.")
-        raise e
 
 #%% The date pairs relate all tweets to the date range for each row in the bitcoin data. This need to be further
 #   filtered into the three different sentiment types using the intersection of the sentiment label indices, and the
 #   date pair indices.
 
+date_pair_mask_source = date_pair_masks_multicore
 # Intersections were sanity checked manually.
 dct_date_pair_indices_by_sent_label = {}
 start = time()
 for label in sent_labels:
     mask_temp = []
-    for date_pair_mask in date_pair_masks_multicore:
-        mask_temp.append(np.where(np.logical_and(dct_sent_label_masks[label], date_pair_mask))[0])
+    for date_pair_mask in date_pair_mask_source:
+        mask_temp.append(np.intersect1d(dct_sent_label_masks[label], date_pair_mask, assume_unique=True))
 
     dct_date_pair_indices_by_sent_label[label] = mask_temp
 end = time()
 print('Time to process {} date pairs took {} seconds'.format(len(date_pair_masks_multicore), end - start))
+
+#%% This was super slow. Let's try mapping with shared mem again.
+
 
 
 #%% So now we need to do feature extraction. This has to iterate over each mask, performing feature extraction on both

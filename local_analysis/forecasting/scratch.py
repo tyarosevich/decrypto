@@ -1,3 +1,4 @@
+#%%
 from multiprocessing import shared_memory
 import numpy as np
 np.random.seed(42)
@@ -25,5 +26,5 @@ dst[:] = test_matrix[:]
 
 shm.close()
 shm.unlink()
-
+#%%
 print("I finished")

@@ -2,7 +2,7 @@ import numpy as np
 import multiprocessing as mp
 import os
 import pandas as pd
-from scipy.stats import moment as scipy_moment
+from scipy.stats import skew, kurtosis
 import local_analysis.forecasting.utils_multiprocess as utils_mp
 from functools import partial as func_partial
 from multiprocessing import shared_memory
@@ -10,7 +10,7 @@ from pathlib import Path
 from pandas._libs.tslibs.timestamps import Timestamp as PdTimestamp
 # data_folder = Path('../../data')
 data_folder = Path('./data')
-path_tokens = Path(data_folder / 'tweet_tokens.pickle')
+path_tokens = Path(data_folder / 'clean_tweet_tokens.pickle')
 path_sent = Path(data_folder / 'sent_val_column.pickle')
 module_mat_tokens = pd.read_pickle(path_tokens)
 module_sent_vals = pd.read_pickle(path_sent)
@@ -130,7 +130,8 @@ def _run_extract_sent_feats_v2(idx_date_pair: np.ndarray, date_start: PdTimestam
     curr_sent_vals = module_sent_vals[idx_date_pair]
     sent_feats = _extract_sent_feats(curr_sent_vals, args['sent_settings'])
 
-    return {'date': date_start, 'sent_vals': curr_sent_vals, 'sent_feats': sent_feats}
+    # return {'date': date_start, 'sent_vals': curr_sent_vals, 'sent_feats': sent_feats}
+    return {'date': date_start, 'sent_vals':curr_sent_vals} | sent_feats
 
 
 def _run_extract_token_feats_v2(idx_date_pair: np.ndarray, date_start: PdTimestamp, args: dict) -> dict:
@@ -138,8 +139,8 @@ def _run_extract_token_feats_v2(idx_date_pair: np.ndarray, date_start: PdTimesta
     curr_tokens = module_mat_tokens[idx_date_pair, :]
     token_feats = _extract_token_feats(curr_tokens, args['token_settings'])
 
-    return {'date': date_start, 'token_vals': curr_tokens, 'token_feats': token_feats}
-
+    # return {'date': date_start, 'token_vals': curr_tokens, 'token_feats': token_feats}
+    return {'date': date_start, 'token_vals': curr_tokens} | token_feats
 
 def multiprocess_feature_extract(date_pair_data: list, sent_scores: np.ndarray, mat_tokens: np.ndarray,
                                  settings: dict, flag_use_mp: bool) -> list:
@@ -233,25 +234,30 @@ def _extract_sent_feats(sent_vals: np.ndarray, settings: dict) -> dict:
 def _feature_extract_factory(extraction_type):
     if extraction_type == 'mean':
         return np.mean
-    if extraction_type == 'median':
+    elif extraction_type == 'median':
         return np.median
-    if extraction_type == 'max':
+    elif extraction_type == 'max':
         return np.max
-    if extraction_type == 'min':
+    elif extraction_type == 'min':
         return np.min
-    if extraction_type == 'moment':
-        return _get_moments
-    if extraction_type == 'std':
+    elif extraction_type == 'std':
         return np.std
+    elif extraction_type == 'variance':
+        return np.var
+    elif extraction_type == 'skewness':
+        return skew
+    elif extraction_type == 'kurtosis':
+        return kurtosis
     else:
         raise ValueError(f'Extraction type {extraction_type} not supported')
 
 
 def _get_moments(vals: np.ndarray) -> dict:
     dict_return = {}
-    moments = ['exp_val', 'variance', 'skewness', 'kurtosis']
-    for i, moment in enumerate(moments):
-        dict_return[moment] = scipy_moment(vals, i)
+    moments = ['variance', 'skewness', 'kurtosis']
+    funs = [np.var, skew, kurtosis]
+    for moment, fun in zip(moments, funs):
+        dict_return[moment] = fun(vals)
 
     return dict_return
 
@@ -270,6 +276,9 @@ def _extract_token_feats(tokens: np.ndarray, settings: dict) -> dict:
     """
     if tokens.size != 0:
         tokens = np.concatenate(tokens)
+        # Mostly EOS/BOS as well as padding and some punctuation that is leaking through for who knows why.
+        bad_tokens = np.array([0, 1, 2, 4, 6, 1174])
+        tokens = np.delete(tokens, np.where(np.isin(tokens, bad_tokens))) # Drop padding and EOS/BOS tokens.
         unique, counts = np.unique(tokens, return_counts=True)
         idx = np.flip(np.argsort(counts))[0:settings['top_n']]
         top_tokens = unique[idx]

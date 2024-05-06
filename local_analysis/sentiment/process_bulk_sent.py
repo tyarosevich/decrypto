@@ -5,6 +5,12 @@ from torch.cuda import is_available
 assert(is_available())
 from time import time
 import numpy as np
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk import word_tokenize
+from string import punctuation
+from bs4 import BeautifulSoup
+
 
 # Load the historical tweet file
 path_tweets = Path('data/tweets_combined.csv')
@@ -73,11 +79,14 @@ if flag_batch_process:
 else:
     tweet_batch = df_tweets['text'].to_list()
 
+#%%
+
 start = time()
 output_batch = sentiment_pipeline(tweet_batch, max_length=512, truncation=True, padding=True)
 end = time()
 print("Processing tweets took {} seconds".format(end - start))
 df_output = pd.DataFrame(output_batch)
+
 token_output = sentiment_pipeline.tokenizer(tweet_batch, max_length=token_size, truncation=True, padding=True)
 
 # Process batch or process everything.

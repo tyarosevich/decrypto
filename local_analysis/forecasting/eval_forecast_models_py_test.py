@@ -256,35 +256,23 @@ tmp_dtypes = ['Int64'] * 20 # Note this is panda's nullable integer dtype.
 dct_token_df_types = dict(zip(df_token_feats.columns[1:], tmp_dtypes))
 df_token_feats = df_token_feats.astype(dct_token_df_types)
 
-df_sent_feats_neg = pd.DataFrame(map_output['sent_feats']['negative'])
-all_sent_vals_per_hour = df_sent_feats_neg['sent_vals'].to_list()
-df_sent_feats_neg.drop(columns=['sent_vals'], inplace=True)
-curr_cols = list(df_sent_feats_neg.columns)
-sent_cols = ['date'] + [col + '_neg' for col in curr_cols if col not in ['date']]
-df_sent_feats_neg.rename(columns=dict(zip(curr_cols, sent_cols)), inplace=True)
+dct_sentiment_frames = {}
+for label in sent_labels:
+    dct_sentiment_frames[label] = pd.DataFrame(map_output['sent_feats'][label])
+    dct_sentiment_frames[label].drop(columns=['sent_vals'], inplace=True)
+    curr_cols = list(dct_sentiment_frames[label].columns)
+    sent_cols = ['date'] + [col + '_' + label[0:3] for col in curr_cols if col not in ['date']]
+    dct_sentiment_frames[label].rename(columns=dict(zip(curr_cols, sent_cols)), inplace=True)
 
-df_sent_feats_pos = pd.DataFrame(map_output['sent_feats']['positive'])
-all_sent_vals_per_hour = df_sent_feats_pos['sent_vals'].to_list()
-df_sent_feats_pos.drop(columns=['sent_vals'], inplace=True)
-curr_cols = list(df_sent_feats_pos.columns)
-sent_cols = ['date'] + [col + '_pos' for col in curr_cols if col not in ['date']]
-df_sent_feats_pos.rename(columns=dict(zip(curr_cols, sent_cols)), inplace=True)
+dct_sentiment_frames['tokens'] = df_token_feats
 
-df_sent_feats_neutr = pd.DataFrame(map_output['sent_feats']['neutral'])
-all_sent_vals_per_hour = df_sent_feats_neutr['sent_vals'].to_list()
-df_sent_feats_neutr.drop(columns=['sent_vals'], inplace=True)
-curr_cols = list(df_sent_feats_neutr.columns)
-sent_cols = ['date'] + [col + '_neutr' for col in curr_cols if col not in ['date']]
-df_sent_feats_neutr.rename(columns=dict(zip(curr_cols, sent_cols)), inplace=True)
+df_bitcoin_tweet_feats_merged = df_bitcoin_post_tweets.copy()
+for df in dct_sentiment_frames.values():
+    df_bitcoin_tweet_feats_merged = pd.merge_asof(df_bitcoin_tweet_feats_merged, df, on='date', tolerance=pd.Timedelta(minutes=1))
 
 
-df_bitcoin_sent_feats_merged = df_bitcoin_post_tweets.copy()
-for df in [df_sent_feats_neg, df_sent_feats_neutr, df_sent_feats_pos]:
-    df_bitcoin_sent_feats_merged = pd.merge_asof(df_bitcoin_sent_feats_merged, df, on='date', tolerance=pd.Timedelta(minutes=1))
-
-
-path_btc_sent_feats_merged = Path(data_folder / 'btc_sent_feats_merged.pickle')
-pd.to_pickle(df_bitcoin_sent_feats_merged, path_btc_sent_feats_merged)
+path_btc_tweet_feats_merged = Path(data_folder / 'btc_tweet_feats_merged.pickle')
+pd.to_pickle(df_bitcoin_tweet_feats_merged, path_btc_tweet_feats_merged)
 
 #%% Need to write a test to sanity check this thing. Let's pick two random hours in the btc dataframe and go slice out
 #   all the data from the tweets and procedurally strip the features to compare.

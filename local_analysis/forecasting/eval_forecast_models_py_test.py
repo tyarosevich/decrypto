@@ -15,7 +15,7 @@ import re
 
 # data_folder = Path('../../data/')
 data_folder = Path('./data/')
-
+#%%
 coin_names = ['BTC', 'ETH', 'SOL', 'LINK', 'USDC']
 dct_coin_tables = {}
 for suffix in coin_names:
@@ -113,16 +113,8 @@ print('Tweets %:\nPositive: {}\nNegative: {}\nNeutral: {}'.format(positive_cnt/d
 dct_sent_label_masks = {}
 sent_labels = ['negative', 'neutral', 'positive']
 for label in sent_labels:
-    mask_temp = np.where(df_tweets['label'] == label)[0]
-    dct_sent_label_masks[label] = mask_temp
-# Neutral needs to be included in some way I think. Perhaps an entire second feature category with all the same moment type features
-# but just or neutral.
-# sent_map = {'negative': -1, 'neutral': 0, 'positive': 1}
-# df_tweets['single_val_sent'] = 0
-# df_tweets['single_val_sent'] = df_tweets['label'].map(sent_map)
-# # Might be a better way to do this that captures neutrality, but for monotonicity, this should be good enough for
-# # cursory analysis.
-# df_tweets['single_val_sent'] = df_tweets['single_val_sent'] * df_tweets['score']
+    idx_temp = np.where(df_tweets['label'] == label)[0]
+    dct_sent_label_masks[label] = idx_temp
 
 #%% Test getting masks with new generalized mp map wrapper.
 from local_analysis.forecasting import utils_multiprocess
@@ -152,44 +144,6 @@ start = time()
 date_pair_masks_multicore = utils_multiprocess.run_shared_mem_multiproc_map(input_data, get_date_mask, shared_data, mp_settings)
 end = time()
 print('Time taken to run multiprocessing map: {} seconds'.format(end - start))
-
-#### IN CASE OF MP ISSUES #####
-# #%% Test getting masks
-#
-# # To calculate the date-pairs we add something like 59m to each hourly start time.
-# pair_starts = df_bitcoin_post_tweets['date'].astype('int64') / 10 ** 9
-# pair_starts = pair_starts.astype(int).to_numpy()
-# pair_ends = pair_starts + 59*60 + 59
-# date_pairs = list(zip(pair_starts[0:-1], pair_ends[0:-1]))
-#
-# tweet_dates = df_tweets['date'].astype('int64') / 10 ** 9
-# tweet_dates = tweet_dates.astype(int).to_numpy()
-# test_pairs = date_pairs[0:1000]
-# # Create index lists for span of time against the tweet timestamps.
-# start = time()
-# # Have to go np.where. The sparse boolean matrices are just too big.
-# date_pair_masks_single_core = [np.where((tweet_dates >= date_start) & (tweet_dates <= date_end))[0] for date_start, date_end in date_pairs]
-# end = time()
-# print('Time taken to create date_pairs single-thread: {}'.format(end - start))
-##################################
-
-
-# #%% The date pairs relate all tweets to the date range for each row in the bitcoin data. This need to be further
-# #   filtered into the three different sentiment types using the intersection of the sentiment label indices, and the
-# #   date pair indices.
-#
-# date_pair_mask_source = date_pair_masks_multicore
-# # Intersections were sanity checked manually.
-# dct_date_pair_indices_by_sent_label = {}
-# start = time()
-# for label in sent_labels:
-#     mask_temp = []
-#     for date_pair_mask in date_pair_mask_source:
-#         mask_temp.append(np.intersect1d(dct_sent_label_masks[label], date_pair_mask, assume_unique=True))
-#
-#     dct_date_pair_indices_by_sent_label[label] = mask_temp
-# end = time()
-# print('Time to process {} date pairs took {} seconds'.format(len(date_pair_masks_multicore), end - start))
 
 #%% This was super slow. Let's try mapping with shared mem again. Was super CPU bound, almost linear speedup x cores.
     # Niiice.
@@ -274,16 +228,16 @@ for df in dct_sentiment_frames.values():
 path_btc_tweet_feats_merged = Path(data_folder / 'btc_tweet_feats_merged.pickle')
 pd.to_pickle(df_bitcoin_tweet_feats_merged, path_btc_tweet_feats_merged)
 
-#%% Need to write a test to sanity check this thing. Let's pick two random hours in the btc dataframe and go slice out
-#   all the data from the tweets and procedurally strip the features to compare.
+#%% Starting point to continue from just the merged btc/feat dataframe.
+path_btc_tweet_feats_merged = Path(data_folder / 'btc_tweet_feats_merged.pickle')
+df_bitcoin_tweet_feats_merged = pd.read_pickle(path_btc_tweet_feats_merged)
 
-#%% Save/Load current file
+#%% This test checks a few random hours and calculates a few different sentiment values, then compares to the
+#   processed values in df_bitcoin_tweet_feats_merged.
 
-flag_overwrite = False
-path_btc_with_sent_feats = Path(data_folder / 'btc_with_sent_feats.pickle')
-if flag_overwrite:
-    pd.to_pickle(path_btc_with_sent_feats, )
-
+from local_analysis.tests.test_feature_extraction import test_tweet_feat_sanity_check
+test_tweet_feat_sanity_check()
+#%%
 # #%% Test LSTM
 # from local_analysis.forecasting.models import forecast_lstm
 # from importlib import reload

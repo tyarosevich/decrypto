@@ -23,7 +23,12 @@ data_folder = Path('./data/')
 coin_names = ['BTC', 'ETH', 'SOL', 'LINK', 'USDC']
 dct_coin_tables = {}
 for suffix in coin_names:
-    dct_coin_tables[suffix] = pd.read_csv(Path(data_folder / 'coin_index_vals_merged_{}.csv'.format(suffix)), parse_dates=['date'])
+    df_temp = pd.read_csv(Path(data_folder / 'coin_index_vals_merged_{}.csv'.format(suffix)), parse_dates=['date'])
+    curr_cols = list(df_temp.columns)
+    bad_cols = [col for col in curr_cols if 'Volume' in col]
+    good_cols = [col.lower().replace(' ', '_') for col in bad_cols]
+    df_temp.rename(columns=dict(zip(bad_cols, good_cols)), inplace=True)
+    dct_coin_tables[suffix] = df_temp
 
 print(dct_coin_tables.keys())
 
@@ -36,25 +41,37 @@ df_btc_eth['close_eth'] = df_btc_eth['close_eth'].ffill()
 btc_close_diff = np.diff(df_btc_eth['close_btc'].to_numpy())
 eth_close_diff = np.diff(df_btc_eth['close_eth'].to_numpy())
 
-pot_start = 10000
-cnt_ether = df_btc_eth['close_eth'].iloc[0] / pot_start
+slice_start = 0
+ether_increase = (df_btc_eth['close_eth'].iloc[-1] - df_btc_eth['close_eth'].iloc[slice_start]) / df_btc_eth['close_eth'].iloc[slice_start]
+df_btc_eth = df_btc_eth.iloc[slice_start:, :]
+
+pot_start = 1000
+cnt_ether = pot_start / df_btc_eth['close_eth'].iloc[0]
 pot = 0
-for i in range(1, df_btc_eth.shape[0], 1):
+cashout_vals = []
+for i in range(2, df_btc_eth.shape[0], 1):
     curr_eth_val = df_btc_eth['close_eth'].iloc[i]
-    flag_btc_increase = df_btc_eth['close_btc'].iloc[i] - df_btc_eth['close_btc'].iloc[i - 1] > 0
-    if not flag_btc_increase and pot == 0:
+    btc_delta = df_btc_eth['close_btc'].iloc[i] - df_btc_eth['close_btc'].iloc[i - 1]
+    if btc_delta < -10 and pot == 0:
         pot = cnt_ether * curr_eth_val
         cnt_ether = 0
-    elif flag_btc_increase and pot > 0:
-        cnt_ether = curr_eth_val / pot
+        cashout_vals.append(pot)
+    elif btc_delta > 10 and pot > 0:
+        cnt_ether = pot / curr_eth_val
         pot = 0
 
 if pot == 0:
-    pot = cnt_ether * df_btc_eth['close_eth'].iloc[-2]
+    pot = cnt_ether * df_btc_eth['close_eth'].iloc[-1]
 
 print(pot)
-time_delta = df_btc_eth['date'].iloc[-2] - df_btc_eth['date'].iloc[0]
-print("Total return of {:.2f} over the course of {}".format(pot/pot_start * 100, time_delta))
+time_delta = df_btc_eth['date'].iloc[-1] - df_btc_eth['date'].iloc[0]
+print("Total return of {:.2f}% over the course of {}".format(pot/pot_start * 100 - 100, time_delta))
+print("ETH return untraded: {}".format(ether_increase * 100))
+
+import seaborn as sns
+from matplotlib import pyplot as plt
+sns.lineplot(x=range(len(cashout_vals)), y = cashout_vals)
+plt.show()
 
 #%% What about with my own, rock solid, daily data?
 path_btc_eth_daily = Path(data_folder / 'raw_crypto_prices_202304251523.csv')
@@ -62,7 +79,7 @@ df_btc_eth_daily = pd.read_csv(path_btc_eth_daily)
 df_btc_eth_daily['created_at'] = pd.to_datetime(df_btc_eth_daily['created_at']).dt.tz_localize('UTC')
 
 pot_start = 1000
-cnt_ether = df_btc_eth_daily['ETHUSD'].iloc[0] / pot_start
+cnt_ether = pot_start / df_btc_eth_daily['ETHUSD'].iloc[0]
 pot = 0
 for i in range(1, df_btc_eth_daily.shape[0], 1):
     curr_eth_val = df_btc_eth_daily['ETHUSD'].iloc[i]
@@ -71,7 +88,7 @@ for i in range(1, df_btc_eth_daily.shape[0], 1):
         pot = cnt_ether * curr_eth_val
         cnt_ether = 0
     elif flag_btc_increase and pot > 0:
-        cnt_ether = curr_eth_val / pot
+        cnt_ether = pot / curr_eth_val
         pot = 0
 
 if pot == 0:
@@ -79,7 +96,7 @@ if pot == 0:
 
 print(pot)
 time_delta = df_btc_eth_daily['created_at'].iloc[-2] - df_btc_eth_daily['created_at'].iloc[0]
-print("Total return of {:.2f} over the course of {}".format(pot/pot_start * 100, time_delta))
+print("Total return of {:.2f} over the course of {}".format(pot/pot_start * 100 - 100, time_delta))
 
 
 #%%
@@ -318,3 +335,33 @@ input_ids = [741, 42988, 11388, 6569, 15113, 7471, 417, 21416, 24987]
 # decoded = tokenizer.decode(input_ids)
 for id in input_ids:
     print('{} : {}'.format(id, str(tokenizer.decode(id))))
+
+#%% Fill strategy.
+
+df_info = df_bitcoin_tweet_feats_merged.info()
+df_describe = df_bitcoin_tweet_feats_merged.describe()
+# These indices are representative of three categories of sentiment features having a significant number of nans.
+idx_skew_neg_null = np.where(df_bitcoin_tweet_feats_merged['skewness_neg'].isnull().values)[0]
+idx_token_null = np.where(df_bitcoin_tweet_feats_merged['freq_token_8'].isnull().values)[0]
+idx_neu_pos_null = np.where(df_bitcoin_tweet_feats_merged['mean_pos'].isnull().values)[0]
+fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(16, 8))
+sns.barplot(y=idx_skew_neg_null, ax=ax[0])
+sns.barplot(y=idx_token_null, ax=ax[1])
+sns.barplot(y=idx_neu_pos_null, ax=ax[2])
+ax[0].set_title('Skewness Negative')
+ax[1].set_title('Token Positive')
+ax[2].set_title('Neutral Positive')
+plt.show()
+# Results are very uniform.
+
+# All sentiment values are filled with interp.
+interp_columns = [col for col in df_bitcoin_tweet_feats_merged.columns if any(substring in col for substring in ['pos', 'neg', 'neu'])]
+# Interp makes no sense for tokens, and the index fund NaNs are usually due to being closed, so these are forward filled.
+ffill_columns = [col for col in df_bitcoin_tweet_feats_merged.columns if any(substring in col for substring in ['freq', 'low', 'high', 'volume', 'open', 'close']) and not any(substring in col for substring in ['SOL', 'UST'])]
+# SOL/UST didn't exist prior to some date.
+zero_columns = ['close_SOL', 'close_UST']
+df_bitcoin_tweet_feats_merged[interp_columns] = df_bitcoin_tweet_feats_merged[interp_columns].interpolate().copy()
+df_bitcoin_tweet_feats_merged[ffill_columns] = df_bitcoin_tweet_feats_merged[ffill_columns].ffill().copy()
+df_bitcoin_tweet_feats_merged[zero_columns] = df_bitcoin_tweet_feats_merged[zero_columns].fillna(0).copy()
+
+df_bitcoin_tweet_feats_merged.info()

@@ -1,3 +1,5 @@
+# TODO: Add quartiles to feature extraction.
+
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -11,6 +13,8 @@ from string import punctuation
 from bs4 import BeautifulSoup
 import multiprocessing as mp
 import re
+from datetime import datetime
+import pytz
 
 
 # data_folder = Path('../../data/')
@@ -25,6 +29,58 @@ print(dct_coin_tables.keys())
 
 df_bitcoin = dct_coin_tables['BTC'] # A view to a table for inspection because VScode Jupyter dict inspection is a catastrophe.
 print(df_bitcoin.columns)
+
+#%% So what was intersting is that there was a huge 1 hr lagged correlation with ether and bitcoin.
+df_btc_eth = df_bitcoin[['date', 'close']].merge(dct_coin_tables['ETH'][['date', 'close']], how='left', on='date', suffixes=['_btc', '_eth'])
+df_btc_eth['close_eth'] = df_btc_eth['close_eth'].ffill()
+btc_close_diff = np.diff(df_btc_eth['close_btc'].to_numpy())
+eth_close_diff = np.diff(df_btc_eth['close_eth'].to_numpy())
+
+pot_start = 10000
+cnt_ether = df_btc_eth['close_eth'].iloc[0] / pot_start
+pot = 0
+for i in range(1, df_btc_eth.shape[0], 1):
+    curr_eth_val = df_btc_eth['close_eth'].iloc[i]
+    flag_btc_increase = df_btc_eth['close_btc'].iloc[i] - df_btc_eth['close_btc'].iloc[i - 1] > 0
+    if not flag_btc_increase and pot == 0:
+        pot = cnt_ether * curr_eth_val
+        cnt_ether = 0
+    elif flag_btc_increase and pot > 0:
+        cnt_ether = curr_eth_val / pot
+        pot = 0
+
+if pot == 0:
+    pot = cnt_ether * df_btc_eth['close_eth'].iloc[-2]
+
+print(pot)
+time_delta = df_btc_eth['date'].iloc[-2] - df_btc_eth['date'].iloc[0]
+print("Total return of {:.2f} over the course of {}".format(pot/pot_start * 100, time_delta))
+
+#%% What about with my own, rock solid, daily data?
+path_btc_eth_daily = Path(data_folder / 'raw_crypto_prices_202304251523.csv')
+df_btc_eth_daily = pd.read_csv(path_btc_eth_daily)
+df_btc_eth_daily['created_at'] = pd.to_datetime(df_btc_eth_daily['created_at']).dt.tz_localize('UTC')
+
+pot_start = 1000
+cnt_ether = df_btc_eth_daily['ETHUSD'].iloc[0] / pot_start
+pot = 0
+for i in range(1, df_btc_eth_daily.shape[0], 1):
+    curr_eth_val = df_btc_eth_daily['ETHUSD'].iloc[i]
+    flag_btc_increase = df_btc_eth_daily['BTCUSD'].iloc[i] - df_btc_eth_daily['BTCUSD'].iloc[i - 1] > 0
+    if not flag_btc_increase and pot == 0:
+        pot = cnt_ether * curr_eth_val
+        cnt_ether = 0
+    elif flag_btc_increase and pot > 0:
+        cnt_ether = curr_eth_val / pot
+        pot = 0
+
+if pot == 0:
+    pot = cnt_ether * df_btc_eth_daily['ETHUSD'].iloc[-2]
+
+print(pot)
+time_delta = df_btc_eth_daily['created_at'].iloc[-2] - df_btc_eth_daily['created_at'].iloc[0]
+print("Total return of {:.2f} over the course of {}".format(pot/pot_start * 100, time_delta))
+
 
 #%%
 tweet_sent_path = Path(data_folder / 'tweets_and_sent.pickle')

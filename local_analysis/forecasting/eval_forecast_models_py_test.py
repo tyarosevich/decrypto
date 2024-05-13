@@ -15,6 +15,8 @@ import multiprocessing as mp
 import re
 from datetime import datetime
 import pytz
+from matplotlib import pyplot as plt
+import seaborn as sns
 
 
 # data_folder = Path('../../data/')
@@ -35,7 +37,7 @@ print(dct_coin_tables.keys())
 df_bitcoin = dct_coin_tables['BTC'] # A view to a table for inspection because VScode Jupyter dict inspection is a catastrophe.
 print(df_bitcoin.columns)
 
-#%% So what was intersting is that there was a huge 1 hr lagged correlation with ether and bitcoin.
+#%% The 1 hr lagged corr was a product of me misinterpreting statsmodels bad documentation. There is no lagged correlation.
 df_btc_eth = df_bitcoin[['date', 'close']].merge(dct_coin_tables['ETH'][['date', 'close']], how='left', on='date', suffixes=['_btc', '_eth'])
 df_btc_eth['close_eth'] = df_btc_eth['close_eth'].ffill()
 btc_close_diff = np.diff(df_btc_eth['close_btc'].to_numpy())
@@ -239,7 +241,8 @@ end = time()
 print('Time to process sent/date pair intersections: {} minutes'.format( (end - start) / 60) )
 
 
-#%% So now we need to do feature extraction. This has to iterate over each mask, performing feature extraction on both
+#%% So now we need to do feature extraction. This has to iterate over each sentiment-types index list,
+#   performing feature extraction each one independently.
 #   Ran into an issue with shared mem where it doesn't work with large variables past a certain size in IDEs. What's
 #   Bizarre is that it works fine in the interpreter, or run in a file from command line. I altered the logic in the
 #   v2 functions to use the module-scoped variable + copy-on-write pattern instead. This requires saving the sent values
@@ -343,14 +346,14 @@ df_describe = df_bitcoin_tweet_feats_merged.describe()
 # These indices are representative of three categories of sentiment features having a significant number of nans.
 idx_skew_neg_null = np.where(df_bitcoin_tweet_feats_merged['skewness_neg'].isnull().values)[0]
 idx_token_null = np.where(df_bitcoin_tweet_feats_merged['freq_token_8'].isnull().values)[0]
-idx_neu_pos_null = np.where(df_bitcoin_tweet_feats_merged['mean_pos'].isnull().values)[0]
+idx_mean_neu_null = np.where(df_bitcoin_tweet_feats_merged['mean_neu'].isnull().values)[0]
 fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(16, 8))
-sns.barplot(y=idx_skew_neg_null, ax=ax[0])
-sns.barplot(y=idx_token_null, ax=ax[1])
-sns.barplot(y=idx_neu_pos_null, ax=ax[2])
+sns.histplot(x=idx_skew_neg_null, ax=ax[0])
+sns.histplot(x=idx_token_null, ax=ax[1])
+sns.histplot(x=idx_mean_neu_null, ax=ax[2])
 ax[0].set_title('Skewness Negative')
 ax[1].set_title('Token Positive')
-ax[2].set_title('Neutral Positive')
+ax[2].set_title('Mean Neutral')
 plt.show()
 # Results are very uniform.
 
@@ -364,4 +367,80 @@ df_bitcoin_tweet_feats_merged[interp_columns] = df_bitcoin_tweet_feats_merged[in
 df_bitcoin_tweet_feats_merged[ffill_columns] = df_bitcoin_tweet_feats_merged[ffill_columns].ffill().copy()
 df_bitcoin_tweet_feats_merged[zero_columns] = df_bitcoin_tweet_feats_merged[zero_columns].fillna(0).copy()
 
+# Finally, add missing date timestamps, forward fill, and switch the index to datetime.
+df_bitcoin_tweet_feats_merged['date'] = pd.to_datetime(df_bitcoin_tweet_feats_merged['date'].dt.tz_localize(None))
+date_index = pd.date_range(df_bitcoin_tweet_feats_merged['date'].iloc[0], df_bitcoin_tweet_feats_merged['date'].iloc[-1], freq='h')
+df_bitcoin_tweet_feats_merged['date'] = pd.DatetimeIndex(df_bitcoin_tweet_feats_merged['date'])
+df_bitcoin_tweet_feats_merged.set_index('date', inplace=True, drop=False)
+
+# Now re-index to the forced data range and forward fill. Only a few hours out of 19,000 were missing.
+df_bitcoin_tweet_feats_merged = df_bitcoin_tweet_feats_merged.reindex(date_index, method='ffill')
+# Need to re-do day of the week - I did it earlier to see it in the correlation matrices.
+df_bitcoin_tweet_feats_merged['day_of_week'] = df_bitcoin_tweet_feats_merged['date'].dt.day_of_week
+
 df_bitcoin_tweet_feats_merged.info()
+
+#%% Let's take a look at some heat maps. Doing all at once would be an info overload, and some of the features wouldn't
+#   surprise anyone if they were correlated (e.g. SP500 vs Dow Jones). Similarly, if the token values were correlated
+#   with the sentiment values, this doesn't reveal much. So I'll do a few different ones with what I view
+#   as sensible combinations.
+
+# Let's start here. Sentiment on the one hand, and token values on the other.
+heat_map_cols_1 = ['close', 'day_of_week', 'volume_usd', 'close_ETH', 'close_SOL', 'close_UST', 'close_SP500',
+                   'close_NSDQ_x', 'mean_neg', 'mean_pos', 'mean_neu']
+heat_map_cols_2 = ['close', 'volume_usd'] + [col for col in list(df_bitcoin_tweet_feats_merged.columns) if 'freq' in col]
+df_heatmap_1 = df_bitcoin_tweet_feats_merged[heat_map_cols_1]
+df_heatmap_2 = df_bitcoin_tweet_feats_merged[heat_map_cols_2]
+
+plt.figure(figsize=(16, 6))
+# define the mask to set the values in the upper triangle to True
+mask = np.triu(np.ones_like(df_heatmap_1.corr(), dtype=bool))
+heatmap = sns.heatmap(df_heatmap_1.corr(), mask=mask, vmin=-1, vmax=1, annot=True, cmap='coolwarm')
+heatmap.set_title('BTC Close Corr Heatmap w/ Indices and Sentiment', fontdict={'fontsize':18}, pad=16)
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(16, 6))
+# define the mask to set the values in the upper triangle to True
+mask = np.triu(np.ones_like(df_heatmap_2.corr(), dtype=bool))
+heatmap = sns.heatmap(df_heatmap_2.corr(), mask=mask, vmin=-1, vmax=1, annot=True, cmap='coolwarm')
+heatmap.set_title('BTC Close Corr Heatmap w/ Top n roBERTa tokens', fontdict={'fontsize':18}, pad=16)
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+#%% Some final encoding/formatting. Extracting month and one-hot encoding day/month, also adding holidays.
+from pandas.tseries.holiday import USFederalHolidayCalendar
+
+holiday_cal = USFederalHolidayCalendar()
+holidays = holiday_cal.holidays(start=df_bitcoin_tweet_feats_merged['date'].iloc[0], end=df_bitcoin_tweet_feats_merged['date'].iloc[-1])
+df_bitcoin_tweet_feats_merged['flag_holiday'] = df_bitcoin_tweet_feats_merged['date'].isin(holidays)
+df_bitcoin_tweet_feats_merged['month'] = df_bitcoin_tweet_feats_merged['date'].dt.month
+
+one_hot_cols = ['day_of_week', 'month']
+df_bitcoin_tweet_feats_merged = pd.get_dummies(df_bitcoin_tweet_feats_merged, columns=one_hot_cols)
+
+
+
+path_btc_tweet_merged_final = Path(data_folder / 'btc_tweet_merged_final.pickle')
+pd.to_pickle(df_bitcoin_tweet_feats_merged, path_btc_tweet_merged_final)
+
+#%% Loading point to begin modeling.
+
+path_btc_tweet_merged_final = Path(data_folder / 'btc_tweet_merged_final.pickle')
+df_btc_data = pd.read_pickle(path_btc_tweet_merged_final)
+
+#%% Imports
+from darts.timeseries import TimeSeries
+
+#%% Note that indices were switched to dateindex upstream, and all missing hours filled, so that the time series
+#   object could be created smoothly.
+
+train_cols_univ = 'close'
+train_cols_multiv = [col for col in df_btc_data.columns if col not in ['unix', 'symbol', 'date']]
+ts_btc_data_univ = TimeSeries.from_dataframe(df_btc_data, value_cols=train_cols_univ)
+ts_btc_data_multiv = TimeSeries.from_dataframe(df_btc_data, value_cols=train_cols_multiv)
+
+ts_btc_data_univ.plot()
+plt.show()

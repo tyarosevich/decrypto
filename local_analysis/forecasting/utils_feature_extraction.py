@@ -277,7 +277,7 @@ def _extract_token_feats(tokens: np.ndarray, settings: dict) -> dict:
     if tokens.size != 0:
         tokens = np.concatenate(tokens)
         # Mostly EOS/BOS as well as padding and some punctuation that is leaking through for who knows why.
-        bad_tokens = np.array([0, 1, 2, 4, 6, 1174])
+        bad_tokens = np.array([0, 1, 2, 4, 6, 1174, 741])
         tokens = np.delete(tokens, np.where(np.isin(tokens, bad_tokens))) # Drop padding and EOS/BOS tokens.
         unique, counts = np.unique(tokens, return_counts=True)
         idx = np.flip(np.argsort(counts))[0:settings['top_n']]
